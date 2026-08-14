@@ -144,7 +144,7 @@
     <ClCompile Include="memberB.cpp" />
     <ClCompile Include="memberC.cpp" />
     <ClCompile Include="memberD.cpp" />
-    <ClCompile Include="moduleA.cpp" />
+    <ClCompile Include="memberA.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="common.h" />
