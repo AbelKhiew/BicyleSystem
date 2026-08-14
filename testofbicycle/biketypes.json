@@ -1,0 +1,14 @@
+[
+  {
+    "id": 1,
+    "type": "normal bicycle",
+    "pricePerDay": 20,
+    "tyreCost": 10,
+    "brakeCost": 6,
+    "chainCost": 5,
+    "deposit": 41,
+    "bookingQuantity": 18,
+    "walkinQuantity": 29,
+    "timesRented": 3
+  }
+]

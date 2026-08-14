@@ -1,0 +1,73 @@
+[
+  {
+    "rentalId": 1,
+    "channel": "Booking",
+    "memberId": 1,
+    "renterName": "abel",
+    "bikeTypeId": 1,
+    "quantity": 2,
+    "rentDate": "2026-07-31",
+    "code": "121734",
+    "pricePerDay": 20,
+    "depositPerUnit": 41,
+    "totalPaid": 122,
+    "paymentMethod": "QR Payment",
+    "status": "Active",
+    "pointsEarned": 0,
+    "pointsAwarded": false,
+    "units": [
+      {
+        "unitIndex": 1,
+        "condition": "-",
+        "tyreDamaged": false,
+        "brakeDamaged": false,
+        "chainDamaged": false,
+        "damageCost": 0,
+        "depositRefunded": 0,
+        "returnedOnTime": true,
+        "isReturned": false
+      },
+      {
+        "unitIndex": 2,
+        "condition": "-",
+        "tyreDamaged": false,
+        "brakeDamaged": false,
+        "chainDamaged": false,
+        "damageCost": 0,
+        "depositRefunded": 0,
+        "returnedOnTime": true,
+        "isReturned": false
+      }
+    ]
+  },
+  {
+    "rentalId": 2,
+    "channel": "WalkIn",
+    "memberId": 1,
+    "renterName": "abel",
+    "bikeTypeId": 1,
+    "quantity": 1,
+    "rentDate": "2026-07-31",
+    "code": "132373",
+    "pricePerDay": 20,
+    "depositPerUnit": 41,
+    "totalPaid": 61,
+    "paymentMethod": "Cash",
+    "status": "Active",
+    "pointsEarned": 0,
+    "pointsAwarded": false,
+    "units": [
+      {
+        "unitIndex": 1,
+        "condition": "-",
+        "tyreDamaged": false,
+        "brakeDamaged": false,
+        "chainDamaged": false,
+        "damageCost": 0,
+        "depositRefunded": 0,
+        "returnedOnTime": true,
+        "isReturned": false
+      }
+    ]
+  }
+]
