@@ -15,7 +15,9 @@ using namespace std;
 
 /* ---------------- Search helpers ---------------- */
 bool isNameTaken(const vector<Member>& members, const string& name) {
-    for (const auto& m : members) if (m.name == name) return true;
+    for (const auto& m : members) {
+        if (m.name == name) return true;
+    }
     return false;
 }
 
@@ -32,26 +34,53 @@ Member* searchMemberByName(vector<Member>& members, const string& name) {
 /* ---------------- Registration (self-service, name must be unique) ---------------- */
 void registerMember() {
     printLine();
-    cout << "REGISTER NEW MEMBER\n";
+    cout << "REGISTER NEW MEMBER (type 'q' at any prompt to go back)\n";
     printLine();
 
     vector<Member> members = loadMembers();
 
-    string name;
-    while (true) {
-        name = getValidatedString("Enter your username: ");
-        if (isNameTaken(members, name)) {
-            cout << "This name is already taken. Please enter again.\n";
-            continue;
+    string name, password, phone;
+    int step = 0;
+    while (step < 3) {
+        InputResult res = InputResult::OK;
+        switch (step) {
+        case 0:
+            while (true) {
+                res = stepString("Choose a username: ", name);
+                if (res == InputResult::BACK) break;
+                if (isNameTaken(members, name)) {
+                    cout << "This name is already taken. Please choose another (or 'q' to go back).\n";
+                    continue;
+                }
+                break;
+            }
+            break;
+        case 1:
+            res = stepString("Choose a password: ", password);
+            break;
+        case 2:
+            res = stepString("Enter phone number: ", phone);
+            break;
         }
-        break;
+
+        if (res == InputResult::BACK) {
+            step--;
+            if (step < 0) {
+                cout << "Registration cancelled.\n";
+                pauseScreen();
+                return;
+            }
+        }
+        else {
+            step++;
+        }
     }
 
     Member newMember;
     newMember.id = getNextMemberId(members);
     newMember.name = name;
-    newMember.password = getValidatedString("Enter your password: ");
-    newMember.phone = getValidatedString("Enter your phone number: ");
+    newMember.password = password;
+    newMember.phone = phone;
     newMember.totalRentals = 0;
     newMember.points = 0;
 
@@ -62,6 +91,7 @@ void registerMember() {
     pauseScreen();
 }
 
+/* Verifies renter login by name + password. On success, sets memberIdOut. */
 bool renterLoginCheck(const string& name, const string& password, int& memberIdOut) {
     vector<Member> members = loadMembers();
     for (const auto& m : members) {
@@ -96,7 +126,12 @@ void viewAllMembers() {
 
 void searchMemberMenu() {
     vector<Member> members = loadMembers();
-    string name = getValidatedString("Enter renter name to search: ");
+    string name;
+    if (stepString("Enter renter name to search (or 'q' to cancel): ", name) == InputResult::BACK) {
+        cout << "Cancelled.\n";
+        pauseScreen();
+        return;
+    }
 
     Member* found = searchMemberByName(members, name);
     printLine();
@@ -116,7 +151,12 @@ void searchMemberMenu() {
 
 void updateMember() {
     vector<Member> members = loadMembers();
-    string name = getValidatedString("Enter renter name to update: ");
+    string name;
+    if (stepString("Enter renter name to update (or 'q' to cancel): ", name) == InputResult::BACK) {
+        cout << "Cancelled.\n";
+        pauseScreen();
+        return;
+    }
 
     Member* found = searchMemberByName(members, name);
     if (found == nullptr) {
@@ -126,7 +166,13 @@ void updateMember() {
     }
 
     cout << "Current Phone: " << found->phone << "\n";
-    found->phone = getValidatedString("Enter new phone: ");
+    string newPhone;
+    if (stepString("Enter new phone (or 'q' to cancel): ", newPhone) == InputResult::BACK) {
+        cout << "Update cancelled.\n";
+        pauseScreen();
+        return;
+    }
+    found->phone = newPhone;
 
     saveMembers(members);
     cout << "Member updated successfully.\n";
@@ -135,7 +181,12 @@ void updateMember() {
 
 void deleteMember() {
     vector<Member> members = loadMembers();
-    string name = getValidatedString("Enter renter name to delete: ");
+    string name;
+    if (stepString("Enter renter name to delete (or 'q' to cancel): ", name) == InputResult::BACK) {
+        cout << "Cancelled.\n";
+        pauseScreen();
+        return;
+    }
 
     bool foundFlag = false;
     vector<Member> updated;
@@ -154,8 +205,8 @@ void deleteMember() {
     pauseScreen();
 }
 
-/* Rental history by renter NAME. Shows quantity, total paid, and the
-   current status (Pending / Active / Completed) for each transaction. */
+/* Rental history shown by renter NAME, including how much each rental
+   actually cost - covers both booking and walk-in channel records. */
 void viewRentalHistory(const string& renterName) {
     vector<Rental> rentals = loadRentals();
     vector<BikeType> bikeTypes = loadBikeTypes();
@@ -185,8 +236,8 @@ void viewRentalHistory(const string& renterName) {
     pauseScreen();
 }
 
-/* Called by billing when ALL units of a rental are returned.
-   RM1 spent on the bike's day price = 1 point (deposit excluded). */
+/* Called by billing after payment - RM1 spent on the bike price = 1 point
+   (deposit is excluded from point calculation, per team requirement). */
 void addPoints(int memberId, int amount) {
     vector<Member> members = loadMembers();
     Member* found = searchMemberById(members, memberId);
@@ -208,6 +259,7 @@ bool deductPoints(int memberId, int amount) {
     return true;
 }
 
+/* Admin-facing sub-menu: view/search/update/delete members + history lookup */
 void memberA_menu() {
     int choice;
     do {
@@ -228,7 +280,12 @@ void memberA_menu() {
         case 3: updateMember(); break;
         case 4: deleteMember(); break;
         case 5: {
-            string name = getValidatedString("Enter renter name: ");
+            string name;
+            if (stepString("Enter renter name (or 'q' to cancel): ", name) == InputResult::BACK) {
+                cout << "Cancelled.\n";
+                pauseScreen();
+                break;
+            }
             viewRentalHistory(name);
             break;
         }

@@ -117,10 +117,10 @@ struct Rental {
     double depositPerUnit = 0.0;  // snapshot at time of booking
     double totalPaid = 0.0;       // quantity * (pricePerDay + depositPerUnit)
     string paymentMethod;
-    string status = "Active";     // "Pending", "Active", "Completed"
+    string status = "Pending";    // "Pending", "Active", "Return"
     int    pointsEarned = 0;
     bool   pointsAwarded = false;
-    string returnDate;            // set when the rental becomes Completed (YYYY-MM-DD)
+    string returnDate;            // set when the rental status becomes "Return" (YYYY-MM-DD)
     vector<RentalUnit> units;
 };
 
@@ -154,6 +154,20 @@ int getValidatedInt(const string& prompt, int minVal, int maxVal);
 double getValidatedDouble(const string& prompt, double minVal, double maxVal);
 string getValidatedString(const string& prompt);
 string getValidatedDate(const string& prompt);   // accepts 't'/'T' for today, or YYYY-MM-DD (validated + not before today)
+
+/* =====================================================================
+   Wizard-style step input - used by multi-field data-entry flows
+   (add bike type, register, book bike, etc.) so the admin/renter can
+   type 'q' at any prompt to step back to the previous field, instead
+   of being stuck if they made a mistake earlier in the flow.
+   ===================================================================== */
+enum class InputResult { OK, BACK };
+
+InputResult stepString(const string& prompt, string& value);                       // non-empty required
+InputResult stepInt(const string& prompt, int minVal, int maxVal, int& value);
+InputResult stepDouble(const string& prompt, double minVal, double maxVal, double& value);
+InputResult stepDate(const string& prompt, string& value);                          // 't' for today, or YYYY-MM-DD
+InputResult stepConfirm(const string& prompt, bool& value);                         // y/n
 
 void pauseScreen();
 void printLine();

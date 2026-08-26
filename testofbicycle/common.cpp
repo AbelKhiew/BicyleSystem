@@ -591,6 +591,133 @@ string getValidatedDate(const string& prompt) {
 }
 
 /* ---------------- Display utilities ---------------- */
+/* ---------------- Wizard-style step input ('q' = go back) ---------------- */
+static bool isQuit(const string& input) {
+    return input == "q" || input == "Q";
+}
+
+InputResult stepString(const string& prompt, string& value) {
+    while (true) {
+        cout << prompt;
+        string input;
+        getline(cin, input);
+        if (cin.eof() && input.empty()) { cout << "\nNo more input. Exiting program.\n"; exit(0); }
+        if (isQuit(input)) return InputResult::BACK;
+        if (input.empty()) {
+            cout << "Input cannot be empty. Please try again (or 'q' to go back).\n";
+            continue;
+        }
+        value = input;
+        return InputResult::OK;
+    }
+}
+
+InputResult stepInt(const string& prompt, int minVal, int maxVal, int& value) {
+    while (true) {
+        cout << prompt;
+        string input;
+        getline(cin, input);
+        if (cin.eof() && input.empty()) { cout << "\nNo more input. Exiting program.\n"; exit(0); }
+        if (isQuit(input)) return InputResult::BACK;
+        try {
+            size_t idx;
+            int v = stoi(input, &idx);
+            if (idx != input.size()) throw invalid_argument("trailing characters");
+            if (v < minVal || v > maxVal) {
+                cout << "Please enter a number between " << minVal << " and " << maxVal
+                    << " (or 'q' to go back).\n";
+                continue;
+            }
+            value = v;
+            return InputResult::OK;
+        }
+        catch (...) {
+            cout << "Invalid number. Please try again (or 'q' to go back).\n";
+        }
+    }
+}
+
+InputResult stepDouble(const string& prompt, double minVal, double maxVal, double& value) {
+    while (true) {
+        cout << prompt;
+        string input;
+        getline(cin, input);
+        if (cin.eof() && input.empty()) { cout << "\nNo more input. Exiting program.\n"; exit(0); }
+        if (isQuit(input)) return InputResult::BACK;
+        try {
+            size_t idx;
+            double v = stod(input, &idx);
+            if (idx != input.size()) throw invalid_argument("trailing characters");
+            if (v < minVal || v > maxVal) {
+                cout << "Please enter a value between " << minVal << " and " << maxVal
+                    << " (or 'q' to go back).\n";
+                continue;
+            }
+            value = v;
+            return InputResult::OK;
+        }
+        catch (...) {
+            cout << "Invalid number. Please try again (or 'q' to go back).\n";
+        }
+    }
+}
+
+InputResult stepDate(const string& prompt, string& value) {
+    while (true) {
+        cout << prompt;
+        string input;
+        getline(cin, input);
+        if (cin.eof() && input.empty()) { cout << "\nNo more input. Exiting program.\n"; exit(0); }
+        if (isQuit(input)) return InputResult::BACK;
+
+        if (input == "t" || input == "T") {
+            value = getCurrentDateString();
+            return InputResult::OK;
+        }
+
+        bool structureOk = (input.size() == 10 && input[4] == '-' && input[7] == '-');
+        if (structureOk) {
+            for (size_t i = 0; i < input.size() && structureOk; i++) {
+                if (i == 4 || i == 7) continue;
+                if (!isdigit((unsigned char)input[i])) structureOk = false;
+            }
+        }
+        if (!structureOk) {
+            cout << "Invalid format. Use YYYY-MM-DD, 't' for today, or 'q' to go back.\n";
+            continue;
+        }
+
+        int year = stoi(input.substr(0, 4));
+        int month = stoi(input.substr(5, 2));
+        int day = stoi(input.substr(8, 2));
+
+        if (!isValidCalendarDate(year, month, day)) {
+            cout << "Invalid date - check the month (01-12) and day are within range (or 'q' to go back).\n";
+            continue;
+        }
+        if (isDateBeforeToday(input)) {
+            cout << "Date cannot be before today (" << getCurrentDateString()
+                << "). Please try again (or 'q' to go back).\n";
+            continue;
+        }
+        value = input;
+        return InputResult::OK;
+    }
+}
+
+InputResult stepConfirm(const string& prompt, bool& value) {
+    while (true) {
+        cout << prompt;
+        string input;
+        getline(cin, input);
+        if (cin.eof() && input.empty()) { cout << "\nNo more input. Exiting program.\n"; exit(0); }
+        if (isQuit(input)) return InputResult::BACK;
+        if (input == "y" || input == "Y") { value = true; return InputResult::OK; }
+        if (input == "n" || input == "N") { value = false; return InputResult::OK; }
+        cout << "Please enter y or n (or 'q' to go back).\n";
+    }
+}
+
 void pauseScreen() {
     cout << "\nPress Enter to continue...";
     cin.ignore(numeric_limits<streamsize>::max(), '\n');

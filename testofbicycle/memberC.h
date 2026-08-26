@@ -9,8 +9,8 @@
 
 void memberC_menu();
 
-void activateReservation();     // admin: activate a Pending future booking via code
-void processReturn();           // admin: return one or more units, per-unit damage
+void processReturn();
+void printReceipt(const Rental& rental, const string& bikeTypeName);
 void viewReceiptMenu();
 
 #endif

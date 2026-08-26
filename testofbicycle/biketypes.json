@@ -7,8 +7,20 @@
     "brakeCost": 6,
     "chainCost": 5,
     "deposit": 41,
-    "bookingQuantity": 18,
-    "walkinQuantity": 29,
-    "timesRented": 3
+    "bookingQuantity": 14,
+    "walkinQuantity": 28,
+    "timesRented": 10
+  },
+  {
+    "id": 2,
+    "type": "1",
+    "pricePerDay": 12,
+    "tyreCost": 12,
+    "brakeCost": 12,
+    "chainCost": 12,
+    "deposit": 56,
+    "bookingQuantity": 12,
+    "walkinQuantity": 12,
+    "timesRented": 0
   }
 ]

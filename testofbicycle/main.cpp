@@ -36,7 +36,8 @@ void showIntro() {
     printLine();
 }
 
-/* Renter menu: booking/reservation self-service only. */
+/* Renter menu: booking/reservation self-service only. Admin never sees
+   this - walk-in rentals are handled separately via Member B's module. */
 void renterMenu(int memberId, const string& renterName) {
     int choice;
     do {
@@ -70,9 +71,8 @@ void adminMenu() {
         cout << "1. Customer / Member Management\n";
         cout << "2. Bicycle Inventory Management\n";
         cout << "3. Walk-in Rental\n";
-        cout << "4. Activate Reservation (future bookings)\n";
-        cout << "5. Return Processing & Billing\n";
-        cout << "6. Reporting & Statistics\n";
+        cout << "4. Return Processing & Billing\n";
+        cout << "5. Reporting & Statistics\n";
         cout << "0. Logout\n";
         choice = getValidatedInt("Enter choice: ", 0, 5);
 
@@ -80,9 +80,8 @@ void adminMenu() {
         case 1: memberA_menu(); break;
         case 2: memberB_menu(); break;
         case 3: walkInRental(); break;
-        case 4: activateReservation(); break;
-        case 5: memberC_menu(); break;
-        case 6: memberD_menu(); break;
+        case 4: memberC_menu(); break;
+        case 5: memberD_menu(); break;
         case 0: cout << "Logging out...\n"; break;
         }
     } while (choice != 0);

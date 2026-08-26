@@ -28,7 +28,12 @@ void activateReservation() {
     printLine();
 
     vector<Rental> rentals = loadRentals();
-    string code = getValidatedString("Enter reservation code: ");
+    string code;
+    if (stepString("Enter reservation code (or 'q' to cancel): ", code) == InputResult::BACK) {
+        cout << "Cancelled.\n";
+        pauseScreen();
+        return;
+    }
 
     Rental* found = nullptr;
     for (auto& r : rentals) {
@@ -41,8 +46,8 @@ void activateReservation() {
     else if (found->status == "Active") {
         cout << "This reservation is already active.\n";
     }
-    else if (found->status == "Completed") {
-        cout << "This reservation has already been completed.\n";
+    else if (found->status == "Return") {
+        cout << "This reservation has already been returned.\n";
     }
     else {
         found->status = "Active";
@@ -53,13 +58,67 @@ void activateReservation() {
     pauseScreen();
 }
 
+/* Runs the condition/damage wizard for ONE unit. Sets the unit's
+   condition and damage flags directly. Returns false if the admin
+   backs out of the very first question (condition) for this unit -
+   the caller then moves back to the PREVIOUS unit instead, since
+   nothing is saved to disk until the whole return is finalised. */
+static bool processUnitWizard(RentalUnit& unit) {
+    string cond = unit.condition == "-" ? "" : unit.condition;
+    bool tyre = unit.tyreDamaged, brake = unit.brakeDamaged, chain = unit.chainDamaged;
+
+    int step = 0;
+    while (step < 4) {
+        if (step >= 1 && cond != "Damaged" && cond != "damaged") {
+            break;   // Good condition - no damage sub-questions needed
+        }
+
+        InputResult res = InputResult::OK;
+        switch (step) {
+        case 0:
+            while (true) {
+                res = stepString("  Condition (Good/Damaged): ", cond);
+                if (res == InputResult::BACK) break;
+                if (cond != "Good" && cond != "good" && cond != "Damaged" && cond != "damaged") {
+                    cout << "  Please enter 'Good' or 'Damaged' (or 'q' to go back).\n";
+                    continue;
+                }
+                break;
+            }
+            break;
+        case 1: { bool v = tyre;  res = stepConfirm("  Tyre damaged? (y/n): ", v);  tyre = v;  break; }
+        case 2: { bool v = brake; res = stepConfirm("  Brake damaged? (y/n): ", v); brake = v; break; }
+        case 3: { bool v = chain; res = stepConfirm("  Chain damaged? (y/n): ", v); chain = v; break; }
+        }
+
+        if (res == InputResult::BACK) {
+            step--;
+            if (step < 0) return false;
+        }
+        else {
+            step++;
+        }
+    }
+
+    unit.condition = cond;
+    unit.tyreDamaged = tyre;
+    unit.brakeDamaged = brake;
+    unit.chainDamaged = chain;
+    return true;
+}
+
 void processReturn() {
     printLine();
     cout << "PROCESS BIKE RETURN\n";
     printLine();
 
     vector<Rental> rentals = loadRentals();
-    string code = getValidatedString("Enter reservation/reference code: ");
+    string code;
+    if (stepString("Enter reservation/reference code (or 'q' to cancel): ", code) == InputResult::BACK) {
+        cout << "Cancelled.\n";
+        pauseScreen();
+        return;
+    }
 
     Rental* rentalPtr = nullptr;
     for (auto& r : rentals) {
@@ -78,7 +137,7 @@ void processReturn() {
         pauseScreen();
         return;
     }
-    if (rental.status == "Completed") {
+    if (rental.status == "Return") {
         cout << "This rental has already been fully returned.\n";
         pauseScreen();
         return;
@@ -104,40 +163,59 @@ void processReturn() {
         cout << "Deposit will be FULLY FORFEITED for every unit, regardless of condition.\n\n";
     }
 
+    vector<int> pendingIndices;
+    for (size_t i = 0; i < rental.units.size(); i++) {
+        if (!rental.units[i].isReturned) pendingIndices.push_back((int)i);
+    }
+
+    if (pendingIndices.empty()) {
+        cout << "\nAll units on this rental have already been returned.\n";
+        pauseScreen();
+        return;
+    }
+
+    cout << "Recording condition for each unit (" << pendingIndices.size()
+        << " remaining). Type 'q' at any prompt to go back.\n";
+
+    size_t unitPos = 0;
+    while (unitPos < pendingIndices.size()) {
+        RentalUnit& unit = rental.units[pendingIndices[unitPos]];
+        cout << "\n--- Unit #" << unit.unitIndex << " ---\n";
+
+        bool ok = processUnitWizard(unit);
+        if (!ok) {
+            if (unitPos == 0) {
+                cout << "\nReturn processing cancelled - no changes saved.\n";
+                pauseScreen();
+                return;
+            }
+            unitPos--;
+            continue;
+        }
+        unitPos++;
+    }
+
+    /* All pending units now have condition/damage recorded - compute
+       refunds and finalise. */
     int unitsReturnedNow = 0;
     double totalRefund = 0.0;
 
-    cout << "Recording condition for each unit (" << rental.quantity << " total):\n";
-    for (auto& unit : rental.units) {
-        if (unit.isReturned) continue;   // already processed in a previous session
-
-        cout << "\n--- Unit #" << unit.unitIndex << " ---\n";
-        string cond = getValidatedString("Condition (Good/Damaged): ");
-        unit.condition = cond;
-        unit.returnedOnTime = onTime;
-
+    for (int idx : pendingIndices) {
+        RentalUnit& unit = rental.units[idx];
         double damageCost = 0.0;
-        if (cond == "Damaged" || cond == "damaged") {
-            string ans;
-            ans = getValidatedString("  Tyre damaged? (y/n): ");
-            unit.tyreDamaged = (ans == "y" || ans == "Y");
-            if (unit.tyreDamaged) damageCost += bikeType->tyreCost;
-
-            ans = getValidatedString("  Brake damaged? (y/n): ");
-            unit.brakeDamaged = (ans == "y" || ans == "Y");
+        if (unit.condition == "Damaged" || unit.condition == "damaged") {
+            if (unit.tyreDamaged)  damageCost += bikeType->tyreCost;
             if (unit.brakeDamaged) damageCost += bikeType->brakeCost;
-
-            ans = getValidatedString("  Chain damaged? (y/n): ");
-            unit.chainDamaged = (ans == "y" || ans == "Y");
             if (unit.chainDamaged) damageCost += bikeType->chainCost;
         }
         unit.damageCost = damageCost;
+        unit.returnedOnTime = onTime;
 
         double refund;
         if (!onTime) {
             refund = 0.0;
         }
-        else if (cond == "Damaged" || cond == "damaged") {
+        else if (unit.condition == "Damaged" || unit.condition == "damaged") {
             refund = rental.depositPerUnit - damageCost;
             if (refund < 0) refund = 0;
         }
@@ -149,12 +227,6 @@ void processReturn() {
 
         totalRefund += refund;
         unitsReturnedNow++;
-    }
-
-    if (unitsReturnedNow == 0) {
-        cout << "\nAll units on this rental have already been returned.\n";
-        pauseScreen();
-        return;
     }
 
     /* Restore returned units to the correct quantity pool */
@@ -172,7 +244,7 @@ void processReturn() {
         if (!u.isReturned) { allReturned = false; break; }
     }
     if (allReturned) {
-        rental.status = "Completed";
+        rental.status = "Return";
         rental.returnDate = today;
 
         if (rental.memberId != 0 && !rental.pointsAwarded) {
@@ -215,7 +287,12 @@ void processReturn() {
 void viewReceiptMenu() {
     vector<Rental> rentals = loadRentals();
     vector<BikeType> bikeTypes = loadBikeTypes();
-    string code = getValidatedString("Enter reservation/reference code: ");
+    string code;
+    if (stepString("Enter reservation/reference code (or 'q' to cancel): ", code) == InputResult::BACK) {
+        cout << "Cancelled.\n";
+        pauseScreen();
+        return;
+    }
 
     for (const auto& r : rentals) {
         if (r.code == code) {

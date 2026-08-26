@@ -8,11 +8,15 @@
    - Renter self-service booking: choose quantity, choose date
      ('t' for today or a validated future date), invoice shown,
      payment via QR/Bank Transfer, reservation code generated.
-     Today's bookings start "Active"; future bookings start
-     "Pending" until admin activates them with the code.
+     EVERY self-booking (today or future) starts "Pending" - it
+     only becomes "Active" once the renter shows the admin the
+     reservation code and admin activates it at the counter, which
+     represents confirmed pickup of the bike(s).
    - Admin walk-in rental: separate quantity pool, optional link to
      an existing account (for points), payment via Cash/Card/QR
      Code - Cash collects the amount given and calculates change.
+     Walk-in rentals start "Active" immediately, since admin is
+     personally handing the bike(s) over at the counter.
    ============================================================ */
 #include "memberB.h"
 #include "memberA.h"     // searchMemberByName() - link walk-in to an existing account
@@ -33,21 +37,51 @@ double calcDeposit(double tyreCost, double brakeCost, double chainCost) {
 /* ---------------- Admin: inventory management ---------------- */
 void addBikeType() {
     printLine();
-    cout << "ADD NEW BIKE TYPE\n";
+    cout << "ADD NEW BIKE TYPE (type 'q' at any prompt to go back)\n";
     printLine();
 
     vector<BikeType> bikeTypes = loadBikeTypes();
 
+    string typeName;
+    double pricePerDay = 0, tyreCost = 0, brakeCost = 0, chainCost = 0;
+    int bookingQty = 0, walkinQty = 0;
+
+    int step = 0;
+    while (step < 7) {
+        InputResult res = InputResult::OK;
+        switch (step) {
+        case 0: res = stepString("Enter bike type name (e.g. Mountain Bike): ", typeName); break;
+        case 1: res = stepDouble("Enter price per day (RM): ", 0.5, 1000.0, pricePerDay); break;
+        case 2: res = stepDouble("Enter tyre repair cost (RM): ", 0.0, 500.0, tyreCost); break;
+        case 3: res = stepDouble("Enter brake repair cost (RM): ", 0.0, 500.0, brakeCost); break;
+        case 4: res = stepDouble("Enter chain repair cost (RM): ", 0.0, 500.0, chainCost); break;
+        case 5: res = stepInt("Enter quantity for online booking: ", 0, 1000, bookingQty); break;
+        case 6: res = stepInt("Enter quantity for walk-in rental: ", 0, 1000, walkinQty); break;
+        }
+
+        if (res == InputResult::BACK) {
+            step--;
+            if (step < 0) {
+                cout << "Cancelled adding bike type.\n";
+                pauseScreen();
+                return;
+            }
+        }
+        else {
+            step++;
+        }
+    }
+
     BikeType newType;
     newType.id = getNextBikeTypeId(bikeTypes);
-    newType.type = getValidatedString("Enter bike type name (e.g. Mountain Bike): ");
-    newType.pricePerDay = getValidatedDouble("Enter price per day (RM): ", 0.5, 1000.0);
-    newType.tyreCost = getValidatedDouble("Enter tyre repair cost (RM): ", 0.0, 500.0);
-    newType.brakeCost = getValidatedDouble("Enter brake repair cost (RM): ", 0.0, 500.0);
-    newType.chainCost = getValidatedDouble("Enter chain repair cost (RM): ", 0.0, 500.0);
-    newType.deposit = calcDeposit(newType.tyreCost, newType.brakeCost, newType.chainCost);
-    newType.bookingQuantity = getValidatedInt("Enter quantity for online booking: ", 0, 1000);
-    newType.walkinQuantity = getValidatedInt("Enter quantity for walk-in rental: ", 0, 1000);
+    newType.type = typeName;
+    newType.pricePerDay = pricePerDay;
+    newType.tyreCost = tyreCost;
+    newType.brakeCost = brakeCost;
+    newType.chainCost = chainCost;
+    newType.deposit = calcDeposit(tyreCost, brakeCost, chainCost);
+    newType.bookingQuantity = bookingQty;
+    newType.walkinQuantity = walkinQty;
     newType.timesRented = 0;
 
     bikeTypes.push_back(newType);
@@ -62,7 +96,12 @@ void editBikeType() {
     vector<BikeType> bikeTypes = loadBikeTypes();
     viewBikeTypes();
 
-    int id = getValidatedInt("Enter Bike Type ID to edit: ", 1, 999999);
+    int id;
+    if (stepInt("Enter Bike Type ID to edit (or 'q' to cancel): ", 1, 999999, id) == InputResult::BACK) {
+        cout << "Cancelled.\n";
+        pauseScreen();
+        return;
+    }
     BikeType* b = searchBikeTypeById(bikeTypes, id);
     if (b == nullptr) {
         cout << "Bike type not found.\n";
@@ -70,18 +109,96 @@ void editBikeType() {
         return;
     }
 
-    cout << "Re-enter each value (current shown in brackets):\n";
-    b->type = getValidatedString("Type name [" + b->type + "]: ");
-    b->pricePerDay = getValidatedDouble("Price per day (RM): ", 0.5, 1000.0);
-    b->tyreCost = getValidatedDouble("Tyre repair cost (RM): ", 0.0, 500.0);
-    b->brakeCost = getValidatedDouble("Brake repair cost (RM): ", 0.0, 500.0);
-    b->chainCost = getValidatedDouble("Chain repair cost (RM): ", 0.0, 500.0);
-    b->deposit = calcDeposit(b->tyreCost, b->brakeCost, b->chainCost);
-    b->bookingQuantity = getValidatedInt("Quantity for online booking: ", 0, 1000);
-    b->walkinQuantity = getValidatedInt("Quantity for walk-in rental: ", 0, 1000);
+    cout << "Re-enter each value (current shown in brackets). Type 'q' at any prompt to go back.\n";
+
+    string typeName = b->type;
+    double pricePerDay = b->pricePerDay, tyreCost = b->tyreCost, brakeCost = b->brakeCost, chainCost = b->chainCost;
+    int bookingQty = b->bookingQuantity, walkinQty = b->walkinQuantity;
+
+    int step = 0;
+    while (step < 7) {
+        InputResult res = InputResult::OK;
+        switch (step) {
+        case 0: res = stepString("Type name [" + b->type + "]: ", typeName); break;
+        case 1: res = stepDouble("Price per day (RM): ", 0.5, 1000.0, pricePerDay); break;
+        case 2: res = stepDouble("Tyre repair cost (RM): ", 0.0, 500.0, tyreCost); break;
+        case 3: res = stepDouble("Brake repair cost (RM): ", 0.0, 500.0, brakeCost); break;
+        case 4: res = stepDouble("Chain repair cost (RM): ", 0.0, 500.0, chainCost); break;
+        case 5: res = stepInt("Quantity for online booking: ", 0, 1000, bookingQty); break;
+        case 6: res = stepInt("Quantity for walk-in rental: ", 0, 1000, walkinQty); break;
+        }
+
+        if (res == InputResult::BACK) {
+            step--;
+            if (step < 0) {
+                cout << "Edit cancelled - no changes saved.\n";
+                pauseScreen();
+                return;
+            }
+        }
+        else {
+            step++;
+        }
+    }
+
+    b->type = typeName;
+    b->pricePerDay = pricePerDay;
+    b->tyreCost = tyreCost;
+    b->brakeCost = brakeCost;
+    b->chainCost = chainCost;
+    b->deposit = calcDeposit(tyreCost, brakeCost, chainCost);
+    b->bookingQuantity = bookingQty;
+    b->walkinQuantity = walkinQty;
 
     saveBikeTypes(bikeTypes);
     cout << "\nUpdated! New deposit: RM" << fixed << setprecision(2) << b->deposit << "\n";
+    pauseScreen();
+}
+
+/* Deletes a bike type entirely. Blocked if any non-Return rental still
+   references this type, to avoid breaking active/pending transactions. */
+void deleteBikeType() {
+    vector<BikeType> bikeTypes = loadBikeTypes();
+    viewBikeTypes();
+
+    int id;
+    if (stepInt("Enter Bike Type ID to delete (or 'q' to cancel): ", 1, 999999, id) == InputResult::BACK) {
+        cout << "Cancelled.\n";
+        pauseScreen();
+        return;
+    }
+
+    BikeType* target = searchBikeTypeById(bikeTypes, id);
+    if (target == nullptr) {
+        cout << "Bike type not found.\n";
+        pauseScreen();
+        return;
+    }
+
+    vector<Rental> rentals = loadRentals();
+    for (const auto& r : rentals) {
+        if (r.bikeTypeId == id && r.status != "Return") {
+            cout << "Cannot delete - Rental ID " << r.rentalId << " (" << r.status
+                << ") still references this bike type. It must be returned first.\n";
+            pauseScreen();
+            return;
+        }
+    }
+
+    bool confirm = false;
+    InputResult res = stepConfirm("Delete '" + target->type + "'? This cannot be undone. (y/n): ", confirm);
+    if (res == InputResult::BACK || !confirm) {
+        cout << "Deletion cancelled.\n";
+        pauseScreen();
+        return;
+    }
+
+    vector<BikeType> updated;
+    for (const auto& b : bikeTypes) {
+        if (b.id != id) updated.push_back(b);
+    }
+    saveBikeTypes(updated);
+    cout << "Bike type deleted successfully.\n";
     pauseScreen();
 }
 
@@ -134,20 +251,27 @@ void viewAvailability() {
 /* Shared payment collection + receipt printer.
    isWalkIn = true  -> Cash / Card / QR Code  (Cash asks amount given + shows change)
    isWalkIn = false -> QR Payment / Bank Transfer (renter self-service)          */
-void collectPaymentAndReceipt(const string& renterName, const string& bikeTypeName,
+   /* Shared payment collection + receipt printer.
+      Returns false if the admin/renter cancels payment with 'q' (nothing
+      is saved by the caller in that case); true if payment completed.
+      isWalkIn = true  -> Cash / Card / QR Code  (Cash asks amount given + shows change)
+      isWalkIn = false -> QR Payment / Bank Transfer (renter self-service)          */
+bool collectPaymentAndReceipt(const string& renterName, const string& bikeTypeName,
     int quantity, const string& rentDate, double totalDue,
     const string& code, bool isWalkIn, string& paymentMethodOut) {
     string paymentMethod;
     double cashGiven = 0.0, change = 0.0;
 
     if (isWalkIn) {
+        int choice;
         cout << "\nSelect Payment Method:\n1. Cash\n2. Card\n3. QR Code\n";
-        int choice = getValidatedInt("Enter choice: ", 1, 3);
+        if (stepInt("Enter choice (or 'q' to cancel): ", 1, 3, choice) == InputResult::BACK) return false;
 
         if (choice == 1) {
             paymentMethod = "Cash";
             while (true) {
-                cashGiven = getValidatedDouble("Enter cash received from renter (RM): ", 0.0, 1000000.0);
+                if (stepDouble("Enter cash received from renter (RM) (or 'q' to cancel): ",
+                    0.0, 1000000.0, cashGiven) == InputResult::BACK) return false;
                 if (cashGiven < totalDue) {
                     cout << "Insufficient cash - amount given is less than the total due (RM"
                         << fixed << setprecision(2) << totalDue << "). Please re-enter.\n";
@@ -165,8 +289,9 @@ void collectPaymentAndReceipt(const string& renterName, const string& bikeTypeNa
         }
     }
     else {
+        int choice;
         cout << "\nSelect Payment Method:\n1. QR Payment\n2. Bank Transfer\n";
-        int choice = getValidatedInt("Enter choice: ", 1, 2);
+        if (stepInt("Enter choice (or 'q' to cancel): ", 1, 2, choice) == InputResult::BACK) return false;
         paymentMethod = (choice == 1) ? "QR Payment" : "Bank Transfer";
     }
 
@@ -188,53 +313,83 @@ void collectPaymentAndReceipt(const string& renterName, const string& bikeTypeNa
     }
     cout << left << setw(22) << "Reference Code:" << code << "\n";
     printLine();
+    return true;
 }
 
 /* ---------------- Renter self-service booking (single flow) ---------------- */
 void bookBike(int memberId, const string& renterName) {
     printLine();
-    cout << "BOOK A BICYCLE\n";
+    cout << "BOOK A BICYCLE (type 'q' at any prompt to go back)\n";
     printLine();
 
     vector<BikeType> bikeTypes = loadBikeTypes();
     viewAvailability();
 
-    int typeId = getValidatedInt("Enter Bike Type ID to book: ", 1, 999999);
-    BikeType* bikeType = searchBikeTypeById(bikeTypes, typeId);
+    int typeId = 0, quantity = 0;
+    string rentDate;
+    bool confirm = false;
+    BikeType* bikeType = nullptr;
+    double total = 0.0;
 
-    if (bikeType == nullptr) {
-        cout << "Bike type not found.\n";
-        pauseScreen();
-        return;
+    int step = 0;
+    while (step < 4) {
+        InputResult res = InputResult::OK;
+        switch (step) {
+        case 0:
+            while (true) {
+                res = stepInt("Enter Bike Type ID to book: ", 1, 999999, typeId);
+                if (res == InputResult::BACK) break;
+                bikeType = searchBikeTypeById(bikeTypes, typeId);
+                if (bikeType == nullptr) {
+                    cout << "Bike type not found. Please try again (or 'q' to go back).\n";
+                    continue;
+                }
+                if (bikeType->bookingQuantity <= 0) {
+                    cout << "Sorry, no units of this bike type are available. Choose another (or 'q' to go back).\n";
+                    continue;
+                }
+                break;
+            }
+            break;
+        case 1:
+            res = stepInt("Enter quantity to rent (1-" + to_string(bikeType->bookingQuantity) + "): ",
+                1, bikeType->bookingQuantity, quantity);
+            break;
+        case 2:
+            res = stepDate("Enter rental date (YYYY-MM-DD, or 't' for today): ", rentDate);
+            break;
+        case 3: {
+            total = quantity * (bikeType->pricePerDay + bikeType->deposit);
+            printLine();
+            cout << "INVOICE PREVIEW\n";
+            printLine();
+            cout << fixed << setprecision(2);
+            cout << left << setw(22) << "Bike Type:" << bikeType->type << "\n";
+            cout << left << setw(22) << "Quantity:" << quantity << "\n";
+            cout << left << setw(22) << "Rental Date:" << rentDate << "\n";
+            cout << left << setw(22) << "Price/day x Qty:" << "RM" << (bikeType->pricePerDay * quantity) << "\n";
+            cout << left << setw(22) << "Deposit x Qty:" << "RM" << (bikeType->deposit * quantity) << "\n";
+            cout << left << setw(22) << "TOTAL TO PAY:" << "RM" << total << "\n";
+            printLine();
+            res = stepConfirm("Confirm booking? (y/n, or 'q' to go back): ", confirm);
+            break;
+        }
+        }
+
+        if (res == InputResult::BACK) {
+            step--;
+            if (step < 0) {
+                cout << "Booking cancelled.\n";
+                pauseScreen();
+                return;
+            }
+        }
+        else {
+            step++;
+        }
     }
-    if (bikeType->bookingQuantity <= 0) {
-        cout << "Sorry, no units of this bike type are currently available for booking.\n";
-        pauseScreen();
-        return;
-    }
 
-    int quantity = getValidatedInt(
-        "Enter quantity to rent (1-" + to_string(bikeType->bookingQuantity) + "): ",
-        1, bikeType->bookingQuantity);
-
-    string rentDate = getValidatedDate("Enter rental date (YYYY-MM-DD, or 't' for today): ");
-
-    double total = quantity * (bikeType->pricePerDay + bikeType->deposit);
-
-    printLine();
-    cout << "INVOICE PREVIEW\n";
-    printLine();
-    cout << fixed << setprecision(2);
-    cout << left << setw(22) << "Bike Type:" << bikeType->type << "\n";
-    cout << left << setw(22) << "Quantity:" << quantity << "\n";
-    cout << left << setw(22) << "Rental Date:" << rentDate << "\n";
-    cout << left << setw(22) << "Price/day x Qty:" << "RM" << (bikeType->pricePerDay * quantity) << "\n";
-    cout << left << setw(22) << "Deposit x Qty:" << "RM" << (bikeType->deposit * quantity) << "\n";
-    cout << left << setw(22) << "TOTAL TO PAY:" << "RM" << total << "\n";
-    printLine();
-
-    string confirm = getValidatedString("Confirm booking? (y/n): ");
-    if (confirm != "y" && confirm != "Y") {
+    if (!confirm) {
         cout << "Booking cancelled.\n";
         pauseScreen();
         return;
@@ -242,17 +397,20 @@ void bookBike(int memberId, const string& renterName) {
 
     string code = generateReservationCode();
     string paymentMethod;
-    collectPaymentAndReceipt(renterName, bikeType->type, quantity, rentDate, total, code, false, paymentMethod);
+    if (!collectPaymentAndReceipt(renterName, bikeType->type, quantity, rentDate, total, code, false, paymentMethod)) {
+        cout << "Payment cancelled - booking was not created.\n";
+        pauseScreen();
+        return;
+    }
 
     /* Deduct from booking pool, increment stats */
     bikeType->bookingQuantity -= quantity;
     bikeType->timesRented += quantity;
     saveBikeTypes(bikeTypes);
 
-    /* Today's bookings are usable immediately; future bookings stay
-       Pending until the renter shows the code and admin activates it. */
-    string status = (rentDate == getCurrentDateString()) ? "Active" : "Pending";
-
+    /* EVERY self-booking starts Pending, regardless of date - it only
+       becomes Active once the renter shows this code at the counter
+       and admin activates it (confirms the bike has been picked up). */
     vector<Rental> rentals = loadRentals();
     Rental newRental;
     newRental.rentalId = getNextRentalId(rentals);
@@ -267,7 +425,7 @@ void bookBike(int memberId, const string& renterName) {
     newRental.depositPerUnit = bikeType->deposit;
     newRental.totalPaid = total;
     newRental.paymentMethod = paymentMethod;
-    newRental.status = status;
+    newRental.status = "Pending";
 
     for (int i = 1; i <= quantity; i++) {
         RentalUnit unit;
@@ -279,10 +437,8 @@ void bookBike(int memberId, const string& renterName) {
     saveRentals(rentals);
 
     cout << "\nYour reservation code is: " << code << "\n";
-    if (status == "Pending") {
-        cout << "This booking is for a FUTURE date. Show this code to the admin\n";
-        cout << "on arrival so it can be activated before you take the bike(s).\n";
-    }
+    cout << "Show this code to the admin at the counter to activate your booking\n";
+    cout << "before you can collect the bike(s).\n";
     cout << "Please return before " << SHOP_CLOSE_HOUR << ":00 on " << rentDate
         << " to receive your deposit refund.\n";
     pauseScreen();
@@ -291,30 +447,65 @@ void bookBike(int memberId, const string& renterName) {
 /* ---------------- Admin walk-in rental (separate quantity pool) ---------------- */
 void walkInRental() {
     printLine();
-    cout << "WALK-IN RENTAL (ADMIN)\n";
+    cout << "WALK-IN RENTAL (ADMIN) - type 'q' at any prompt to go back\n";
     printLine();
 
     int linkedMemberId = 0;
     string renterName;
+    bool hasAccount = false;
 
-    string hasAccount = getValidatedString("Does the customer have an account? (y/n): ");
-    if (hasAccount == "y" || hasAccount == "Y") {
-        vector<Member> members = loadMembers();
-        string accountName = getValidatedString("Enter the customer's account name: ");
-        Member* found = searchMemberByName(members, accountName);
+    /* Step 0: does the customer have an account? Step 1: resolve their
+       name (either linked account lookup, or a fresh guest name).      */
+    int nameStep = 0;
+    while (nameStep < 2) {
+        InputResult res = InputResult::OK;
+        switch (nameStep) {
+        case 0:
+            res = stepConfirm("Does the customer have an account? (y/n): ", hasAccount);
+            break;
+        case 1: {
+            if (hasAccount) {
+                vector<Member> members = loadMembers();
+                string accountName;
+                res = stepString("Enter the customer's account name: ", accountName);
+                if (res == InputResult::BACK) break;
 
-        if (found == nullptr) {
-            cout << "No account found with that name. Proceeding as guest (no loyalty points).\n";
-            renterName = getValidatedString("Enter renter's name: ");
+                Member* found = searchMemberByName(members, accountName);
+                if (found == nullptr) {
+                    cout << "No account found with that name. Proceeding as guest (no loyalty points).\n";
+                    linkedMemberId = 0;
+                    string guestName;
+                    InputResult r2 = stepString("Enter renter's name: ", guestName);
+                    if (r2 == InputResult::BACK) {
+                        res = InputResult::BACK;   // re-ask account name
+                        break;
+                    }
+                    renterName = guestName;
+                }
+                else {
+                    linkedMemberId = found->id;
+                    renterName = found->name;
+                    cout << "Account linked: " << renterName << " (Points balance: " << found->points << ")\n";
+                }
+            }
+            else {
+                res = stepString("Enter renter's name: ", renterName);
+            }
+            break;
+        }
+        }
+
+        if (res == InputResult::BACK) {
+            nameStep--;
+            if (nameStep < 0) {
+                cout << "Walk-in rental cancelled.\n";
+                pauseScreen();
+                return;
+            }
         }
         else {
-            linkedMemberId = found->id;
-            renterName = found->name;
-            cout << "Account linked: " << renterName << " (Points balance: " << found->points << ")\n";
+            nameStep++;
         }
-    }
-    else {
-        renterName = getValidatedString("Enter renter's name: ");
     }
 
     vector<BikeType> bikeTypes = loadBikeTypes();
@@ -328,23 +519,47 @@ void walkInRental() {
     }
     printLine();
 
-    int typeId = getValidatedInt("Enter Bike Type ID: ", 1, 999999);
-    BikeType* bikeType = searchBikeTypeById(bikeTypes, typeId);
+    int typeId = 0, quantity = 0;
+    BikeType* bikeType = nullptr;
 
-    if (bikeType == nullptr) {
-        cout << "Bike type not found.\n";
-        pauseScreen();
-        return;
-    }
-    if (bikeType->walkinQuantity <= 0) {
-        cout << "Sorry, no units of this bike type are currently available for walk-in rental.\n";
-        pauseScreen();
-        return;
-    }
+    int step = 0;
+    while (step < 2) {
+        InputResult res = InputResult::OK;
+        switch (step) {
+        case 0:
+            while (true) {
+                res = stepInt("Enter Bike Type ID: ", 1, 999999, typeId);
+                if (res == InputResult::BACK) break;
+                bikeType = searchBikeTypeById(bikeTypes, typeId);
+                if (bikeType == nullptr) {
+                    cout << "Bike type not found. Please try again (or 'q' to go back).\n";
+                    continue;
+                }
+                if (bikeType->walkinQuantity <= 0) {
+                    cout << "Sorry, no units of this bike type are available for walk-in. Choose another (or 'q' to go back).\n";
+                    continue;
+                }
+                break;
+            }
+            break;
+        case 1:
+            res = stepInt("Enter quantity to rent (1-" + to_string(bikeType->walkinQuantity) + "): ",
+                1, bikeType->walkinQuantity, quantity);
+            break;
+        }
 
-    int quantity = getValidatedInt(
-        "Enter quantity to rent (1-" + to_string(bikeType->walkinQuantity) + "): ",
-        1, bikeType->walkinQuantity);
+        if (res == InputResult::BACK) {
+            step--;
+            if (step < 0) {
+                cout << "Walk-in rental cancelled.\n";
+                pauseScreen();
+                return;
+            }
+        }
+        else {
+            step++;
+        }
+    }
 
     string rentDate = getCurrentDateString();   // walk-in is always for today
     double total = quantity * (bikeType->pricePerDay + bikeType->deposit);
@@ -364,12 +579,19 @@ void walkInRental() {
 
     string code = generateReservationCode();
     string paymentMethod;
-    collectPaymentAndReceipt(renterName, bikeType->type, quantity, rentDate, total, code, true, paymentMethod);
+    if (!collectPaymentAndReceipt(renterName, bikeType->type, quantity, rentDate, total, code, true, paymentMethod)) {
+        cout << "Payment cancelled - walk-in rental was not created.\n";
+        pauseScreen();
+        return;
+    }
 
     bikeType->walkinQuantity -= quantity;
     bikeType->timesRented += quantity;
     saveBikeTypes(bikeTypes);
 
+    /* Walk-in rentals start Active immediately - admin is personally
+       handing the bike(s) to the customer at the counter right now,
+       so there is no separate activation step needed. */
     vector<Rental> rentals = loadRentals();
     Rental newRental;
     newRental.rentalId = getNextRentalId(rentals);
@@ -384,7 +606,7 @@ void walkInRental() {
     newRental.depositPerUnit = bikeType->deposit;
     newRental.totalPaid = total;
     newRental.paymentMethod = paymentMethod;
-    newRental.status = "Active";   // walk-in is picked up immediately, no activation needed
+    newRental.status = "Active";
 
     for (int i = 1; i <= quantity; i++) {
         RentalUnit unit;
@@ -410,14 +632,16 @@ void memberB_menu() {
         printLine();
         cout << "1. Add New Bike Type\n";
         cout << "2. Edit Bike Type\n";
-        cout << "3. View All Bike Types\n";
+        cout << "3. Delete Bike Type\n";
+        cout << "4. View All Bike Types\n";
         cout << "0. Back to Main Menu\n";
-        choice = getValidatedInt("Enter choice: ", 0, 3);
+        choice = getValidatedInt("Enter choice: ", 0, 4);
 
         switch (choice) {
         case 1: addBikeType(); break;
         case 2: editBikeType(); break;
-        case 3: viewBikeTypes(); break;
+        case 3: deleteBikeType(); break;
+        case 4: viewBikeTypes(); break;
         case 0: cout << "Returning to main menu...\n"; break;
         }
     } while (choice != 0);

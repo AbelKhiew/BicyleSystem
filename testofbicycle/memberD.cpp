@@ -31,7 +31,7 @@ struct RenterSummary {
 static vector<RenterSummary> buildRenterSummaries(const vector<Rental>& rentals) {
     vector<RenterSummary> summaries;
     for (const auto& r : rentals) {
-        if (r.status != "Completed") continue;
+        if (r.status != "Return") continue;
 
         bool found = false;
         for (auto& s : summaries) {
@@ -67,7 +67,7 @@ void revenueReport() {
     int completedCount = 0;
 
     for (const auto& r : rentals) {
-        if (r.status != "Completed") continue;
+        if (r.status != "Return") continue;
         completedCount++;
         totalCollected += r.totalPaid;
         for (const auto& u : r.units) totalRefunded += u.depositRefunded;
@@ -84,7 +84,7 @@ void revenueReport() {
     printLine();
     cout << "REVENUE REPORT\n";
     printLine();
-    cout << "Completed Rentals: " << completedCount << "\n";
+    cout << "Returned Rentals: " << completedCount << "\n";
     cout << fixed << setprecision(2);
     cout << "Total Collected (incl. deposits): RM" << totalCollected << "\n";
     cout << "Total Deposits Refunded: RM" << totalRefunded << "\n";
@@ -253,7 +253,7 @@ void dailySummaryReport() {
             if (r.channel == "Booking") bookingsToday++;
             else walkinsToday++;
         }
-        if (r.status == "Completed" && r.returnDate == today) {
+        if (r.status == "Return" && r.returnDate == today) {
             returnsToday++;
         }
     }
@@ -270,7 +270,7 @@ void dailySummaryReport() {
     pauseScreen();
 }
 
-/* Lists rentals not yet Completed. Flags Active rentals whose date has
+/* Lists rentals not yet Returned. Flags Active rentals whose date has
    already passed as OVERDUE, and shows Pending (awaiting activation). */
 void overdueList() {
     vector<Rental> rentals = loadRentals();
@@ -285,7 +285,7 @@ void overdueList() {
         << "Bike Type" << setw(5) << "Qty" << setw(12) << "Date" << setw(10) << "Status" << "\n";
 
     for (const auto& r : rentals) {
-        if (r.status != "Completed") {
+        if (r.status != "Return") {
             any = true;
             string bikeTypeName = "Unknown";
             for (const auto& b : bikeTypes) {
