@@ -1,13 +1,12 @@
 /* ============================================================
-   memberB.h
-   MEMBER B - Bicycle Inventory & Rental Booking Module
+   Bicycle Inventory & Rental Booking Module
    ============================================================ */
 #ifndef MEMBERB_H
 #define MEMBERB_H
 
 #include "common.h"
 
-void memberB_menu();          // admin: inventory management only
+void memberB_menu();
 
 /* Inventory management (admin) */
 void addBikeType();

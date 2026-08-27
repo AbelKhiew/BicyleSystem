@@ -1,6 +1,5 @@
 /* ============================================================
-   memberD.cpp
-   MEMBER D - Reporting & Statistics Module (Admin)
+   Reporting & Statistics Module (Admin)
 
    Responsibilities:
    - Revenue report, broken down by payment method
@@ -11,8 +10,6 @@
    - Daily summary report (today's activity at a glance)
    - Active / Pending / Overdue rentals list
 
-   This module is read-only across the shared data files -
-   it aggregates and analyses records that other modules create.
    ============================================================ */
 #include "memberD.h"
 #include <iostream>
@@ -53,49 +50,74 @@ static vector<RenterSummary> buildRenterSummaries(const vector<Rental>& rentals)
     return summaries;
 }
 
-/* Revenue report with a per-payment-method breakdown, using two
-   parallel arrays (names + running totals) as a simple tally table. */
-void revenueReport() {
+void dailySummaryAndRevenueReport() {
     vector<Rental> rentals = loadRentals();
+    string today = getCurrentDateString();
+
+    int totalBookings = 0;
+    int totalBicyclesNotReturned = 0;
+
+    double totalCollectedMoney = 0.0;
+    double totalDepositCollected = 0.0;
+    double totalDepositReturned = 0.0;
 
     const int NUM_METHODS = 5;
     string methodNames[NUM_METHODS] = { "QR Payment", "Bank Transfer", "Cash", "Card", "QR Code" };
     double methodTotals[NUM_METHODS] = { 0, 0, 0, 0, 0 };
-    int methodCounts[NUM_METHODS] = { 0, 0, 0, 0, 0 };
-
-    double totalCollected = 0, totalRefunded = 0;
-    int completedCount = 0;
 
     for (const auto& r : rentals) {
-        if (r.status != "Return") continue;
-        completedCount++;
-        totalCollected += r.totalPaid;
-        for (const auto& u : r.units) totalRefunded += u.depositRefunded;
+        if (r.rentDate == today) {
+ 
+            totalBookings++;
+            totalCollectedMoney += r.totalPaid;
+            totalDepositCollected += (r.depositPerUnit * r.quantity);
 
-        for (int i = 0; i < NUM_METHODS; i++) {
-            if (r.paymentMethod == methodNames[i]) {
-                methodTotals[i] += r.totalPaid;
-                methodCounts[i] += 1;
-                break;
+            for (int i = 0; i < NUM_METHODS; i++) {
+                if (r.paymentMethod == methodNames[i]) {
+                    methodTotals[i] += r.totalPaid;
+                    break;
+                }
+            }
+
+            for (const auto& u : r.units) {
+                if (!u.isReturned) {
+                    totalBicyclesNotReturned++;
+                }
+            }
+        }
+
+        if (r.status == "Return" && r.returnDate == today) {
+            for (const auto& u : r.units) {
+                totalDepositReturned += u.depositRefunded;
             }
         }
     }
 
+    double totalRevenue = totalCollectedMoney - totalDepositReturned;
+
+    // --- Print the Report ---
     printLine();
-    cout << "REVENUE REPORT\n";
+    cout << "DAILY SUMMARY & REVENUE REPORT - " << today << "\n";
     printLine();
-    cout << "Returned Rentals: " << completedCount << "\n";
+
+    cout << left << setw(30) << "Total Booking:" << totalBookings << " reservation(s)\n";
+    cout << left << setw(30) << "Total Bicycle Not Return:" << totalBicyclesNotReturned << " unit(s)\n\n";
+
     cout << fixed << setprecision(2);
-    cout << "Total Collected (incl. deposits): RM" << totalCollected << "\n";
-    cout << "Total Deposits Refunded: RM" << totalRefunded << "\n";
-    cout << "Net Revenue (after refunds): RM" << (totalCollected - totalRefunded) << "\n";
-    printLine();
+    cout << "Total Collected Money: RM" << totalCollectedMoney << "\n";
     cout << "Breakdown by Payment Method:\n";
     for (int i = 0; i < NUM_METHODS; i++) {
-        if (methodCounts[i] == 0) continue;
-        cout << left << setw(16) << methodNames[i] << setw(6) << methodCounts[i]
-            << "tx  RM" << methodTotals[i] << "\n";
+        if (methodTotals[i] > 0) {
+            cout << "  - " << left << setw(15) << methodNames[i]
+                << ": RM" << methodTotals[i] << "\n";
+        }
     }
+
+    cout << "\n";
+    cout << left << setw(30) << "Total Deposit Collected:" << "RM" << totalDepositCollected << "\n";
+    cout << left << setw(30) << "Total Deposit Return:" << "RM" << totalDepositReturned << "\n";
+    printLine();
+    cout << left << setw(30) << "TOTAL REVENUE:" << "RM" << totalRevenue << "\n";
     printLine();
     pauseScreen();
 }
@@ -127,8 +149,7 @@ void mostRentedTypeReport() {
     pauseScreen();
 }
 
-/* Breaks down total repair spend by part (tyre/brake/chain), looking
-   up each rental's bike type to price the damage that was recorded. */
+// Breaks down total repair spend by part (tyre/brake/chain).
 void damageCostReport() {
     vector<Rental> rentals = loadRentals();
     vector<BikeType> bikeTypes = loadBikeTypes();
@@ -170,8 +191,7 @@ void damageCostReport() {
     pauseScreen();
 }
 
-/* Counts and totals deposits forfeited due to late returns
-   (deposit is fully forfeited per unit when a return is late). */
+// Counts and totals deposits forfeited due to late returns
 void lateReturnReport() {
     vector<Rental> rentals = loadRentals();
 
@@ -197,9 +217,7 @@ void lateReturnReport() {
     pauseScreen();
 }
 
-/* Top 3 renters by total spending - repeatedly scans for the
-   current maximum among not-yet-picked entries (selection-style
-   top-N without needing a full sort). */
+//Top 3 renters by total spending
 void topRentersReport() {
     vector<Rental> rentals = loadRentals();
     vector<RenterSummary> summaries = buildRenterSummaries(rentals);
@@ -233,39 +251,6 @@ void topRentersReport() {
         cout << rank << ". " << summaries[maxIdx].name << " - RM" << fixed << setprecision(2)
             << summaries[maxIdx].totalSpent << " (" << summaries[maxIdx].rentalCount << " rentals)\n";
     }
-    printLine();
-    pauseScreen();
-}
-
-/* Snapshot of today's activity: new bookings placed today, walk-ins
-   served today, rentals fully returned today, and revenue collected
-   from bookings/walk-ins made today. */
-void dailySummaryReport() {
-    vector<Rental> rentals = loadRentals();
-    string today = getCurrentDateString();
-
-    int bookingsToday = 0, walkinsToday = 0, returnsToday = 0;
-    double revenueToday = 0;
-
-    for (const auto& r : rentals) {
-        if (r.rentDate == today) {
-            revenueToday += r.totalPaid;
-            if (r.channel == "Booking") bookingsToday++;
-            else walkinsToday++;
-        }
-        if (r.status == "Return" && r.returnDate == today) {
-            returnsToday++;
-        }
-    }
-
-    printLine();
-    cout << "DAILY SUMMARY - " << today << "\n";
-    printLine();
-    cout << "New Bookings Today: " << bookingsToday << "\n";
-    cout << "Walk-ins Served Today: " << walkinsToday << "\n";
-    cout << "Rentals Returned Today: " << returnsToday << "\n";
-    cout << fixed << setprecision(2);
-    cout << "Revenue Collected Today: RM" << revenueToday << "\n";
     printLine();
     pauseScreen();
 }
@@ -310,24 +295,22 @@ void memberD_menu() {
         printLine();
         cout << "REPORTING & STATISTICS (ADMIN)\n";
         printLine();
-        cout << "1. Revenue Report (by payment method)\n";
+        cout << "1. Daily Summary & Revenue Report\n";
         cout << "2. Most Rented Bike Type\n";
         cout << "3. Damage Cost Report\n";
         cout << "4. Late Return Report\n";
         cout << "5. Top Renters Report\n";
-        cout << "6. Daily Summary Report\n";
-        cout << "7. Active / Pending / Overdue Rentals List\n";
+        cout << "6. Active / Pending / Overdue Rentals List\n";
         cout << "0. Back to Main Menu\n";
-        choice = getValidatedInt("Enter choice: ", 0, 7);
+        choice = getValidatedInt("Enter choice: ", 0, 6);
 
         switch (choice) {
-        case 1: revenueReport(); break;
+        case 1: dailySummaryAndRevenueReport(); break;
         case 2: mostRentedTypeReport(); break;
         case 3: damageCostReport(); break;
         case 4: lateReturnReport(); break;
         case 5: topRentersReport(); break;
-        case 6: dailySummaryReport(); break;
-        case 7: overdueList(); break;
+        case 6: overdueList(); break;
         case 0: cout << "Returning to main menu...\n"; break;
         }
     } while (choice != 0);

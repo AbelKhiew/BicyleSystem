@@ -113,9 +113,11 @@ struct Rental {
     int    quantity = 0;
     string rentDate;              // YYYY-MM-DD
     string code;                  // reservation / reference code
-    double pricePerDay = 0.0;     // snapshot at time of booking
+    double pricePerDay = 0.0;     // snapshot at time of booking (undiscounted rate)
     double depositPerUnit = 0.0;  // snapshot at time of booking
-    double totalPaid = 0.0;       // quantity * (pricePerDay + depositPerUnit)
+    int    discountApplied = 0;   // % discount redeemed against the price portion (0 if none)
+    int    discountPointsUsed = 0; // loyalty points spent to redeem the discount
+    double totalPaid = 0.0;       // actual amount charged (after discount, after cash rounding if Cash)
     string paymentMethod;
     string status = "Pending";    // "Pending", "Active", "Return"
     int    pointsEarned = 0;
@@ -123,6 +125,11 @@ struct Rental {
     string returnDate;            // set when the rental status becomes "Return" (YYYY-MM-DD)
     vector<RentalUnit> units;
 };
+
+/* ---------------- Loyalty discount tier table (points -> % off price portion) ---------------- */
+const int NUM_DISCOUNT_TIERS = 5;
+const int discountPointsReq[NUM_DISCOUNT_TIERS] = { 16, 32, 48, 64, 80 };
+const int discountPercentTable[NUM_DISCOUNT_TIERS] = { 10, 20, 30, 40, 50 };
 
 /* ---------------- Predefined damage part names (for display) ---------------- */
 const int NUM_DAMAGE_PARTS = 3;

@@ -1,8 +1,6 @@
 /* ============================================================
-   main.cpp
    BICYCLE RENTAL MANAGEMENT SYSTEM
 
-   TEAM COMPONENT:
    - Introduction screen
    - Login: Renter (name + password) / Admin (hardcoded id=a, pass=a)
    - Main menu navigation branching to each member's module
@@ -18,7 +16,7 @@
 #include <ctime>
 using namespace std;
 
-/* Hardcoded admin credentials: ID = a, Password = a */
+// Hardcoded admin
 bool adminLogin() {
     string id, password;
     cout << "Admin ID: ";
@@ -36,32 +34,26 @@ void showIntro() {
     printLine();
 }
 
-/* Renter menu: booking/reservation self-service only. Admin never sees
-   this - walk-in rentals are handled separately via Member B's module. */
+
 void renterMenu(int memberId, const string& renterName) {
     int choice;
     do {
         printLine();
         cout << "RENTER MENU  (" << renterName << ")\n";
         printLine();
-        cout << "1. View Bike Availability\n";
-        cout << "2. Book a Bike\n";
-        cout << "3. View My Rental History\n";
+        cout << "1. Book a Bicycle\n";
+        cout << "2. View My Rental History\n";
         cout << "0. Logout\n";
-        choice = getValidatedInt("Enter choice: ", 0, 3);
+        choice = getValidatedInt("Enter choice: ", 0, 2);
 
         switch (choice) {
-        case 1: viewAvailability(); break;
-        case 2: bookBike(memberId, renterName); break;
-        case 3: viewRentalHistory(renterName); break;
+        case 1: bookBike(memberId, renterName); break;
+        case 2: viewRentalHistory(renterName); break;
         case 0: cout << "Logging out...\n"; break;
         }
     } while (choice != 0);
 }
 
-/* Admin menu: Walk-in Rental has its own top-level entry (not nested
-   inside Inventory Management). Admin has NO access to the renter's
-   self-service booking/reservation flow. */
 void adminMenu() {
     int choice;
     do {
@@ -71,17 +63,19 @@ void adminMenu() {
         cout << "1. Customer / Member Management\n";
         cout << "2. Bicycle Inventory Management\n";
         cout << "3. Walk-in Rental\n";
-        cout << "4. Return Processing & Billing\n";
-        cout << "5. Reporting & Statistics\n";
+        cout << "4. Activate Reservation\n";
+        cout << "5. Return Processing & Billing\n";
+        cout << "6. Reporting & Statistics\n";
         cout << "0. Logout\n";
-        choice = getValidatedInt("Enter choice: ", 0, 5);
+        choice = getValidatedInt("Enter choice: ", 0, 6);
 
         switch (choice) {
         case 1: memberA_menu(); break;
         case 2: memberB_menu(); break;
         case 3: walkInRental(); break;
-        case 4: memberC_menu(); break;
-        case 5: memberD_menu(); break;
+        case 4: activateReservation(); break;
+        case 5: memberC_menu(); break;
+        case 6: memberD_menu(); break;
         case 0: cout << "Logging out...\n"; break;
         }
     } while (choice != 0);
@@ -138,7 +132,7 @@ int main() {
 
     printLine();
     cout << "   Thank you for using the Bicycle Rental Management System.\n";
-    cout << "                     Have a safe ride! Goodbye.\n";
+    cout << "                         Goodbye(^w^).\n";
     printLine();
 
     return 0;

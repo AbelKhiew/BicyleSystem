@@ -1,6 +1,5 @@
 /* ============================================================
-   memberC.h
-   MEMBER C - Return Processing & Billing / Payment Module
+   Return Processing & Billing / Payment Module
    ============================================================ */
 #ifndef MEMBERC_H
 #define MEMBERC_H
@@ -12,5 +11,6 @@ void memberC_menu();
 void processReturn();
 void printReceipt(const Rental& rental, const string& bikeTypeName);
 void viewReceiptMenu();
+void activateReservation();
 
 #endif

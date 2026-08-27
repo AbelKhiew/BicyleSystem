@@ -1,6 +1,5 @@
 /* ============================================================
-   memberA.cpp
-   MEMBER A - Customer / Member Management Module
+   Customer / Member Management Module
 
    Responsibilities:
    - Renter self-registration (name/password/phone, name unique)
@@ -13,7 +12,6 @@
 #include <iomanip>
 using namespace std;
 
-/* ---------------- Search helpers ---------------- */
 bool isNameTaken(const vector<Member>& members, const string& name) {
     for (const auto& m : members) {
         if (m.name == name) return true;
@@ -31,7 +29,6 @@ Member* searchMemberByName(vector<Member>& members, const string& name) {
     return nullptr;
 }
 
-/* ---------------- Registration (self-service, name must be unique) ---------------- */
 void registerMember() {
     printLine();
     cout << "REGISTER NEW MEMBER (type 'q' at any prompt to go back)\n";
@@ -46,7 +43,7 @@ void registerMember() {
         switch (step) {
         case 0:
             while (true) {
-                res = stepString("Choose a username: ", name);
+                res = stepString("Enter username: ", name);
                 if (res == InputResult::BACK) break;
                 if (isNameTaken(members, name)) {
                     cout << "This name is already taken. Please choose another (or 'q' to go back).\n";
@@ -56,7 +53,7 @@ void registerMember() {
             }
             break;
         case 1:
-            res = stepString("Choose a password: ", password);
+            res = stepString("Enter password: ", password);
             break;
         case 2:
             res = stepString("Enter phone number: ", phone);
@@ -91,7 +88,6 @@ void registerMember() {
     pauseScreen();
 }
 
-/* Verifies renter login by name + password. On success, sets memberIdOut. */
 bool renterLoginCheck(const string& name, const string& password, int& memberIdOut) {
     vector<Member> members = loadMembers();
     for (const auto& m : members) {
@@ -103,7 +99,6 @@ bool renterLoginCheck(const string& name, const string& password, int& memberIdO
     return false;
 }
 
-/* ---------------- Admin-side management ---------------- */
 void viewAllMembers() {
     vector<Member> members = loadMembers();
     printLine();
@@ -149,7 +144,7 @@ void searchMemberMenu() {
     pauseScreen();
 }
 
-void updateMember() {
+void modifyMember() {
     vector<Member> members = loadMembers();
     string name;
     if (stepString("Enter renter name to update (or 'q' to cancel): ", name) == InputResult::BACK) {
@@ -164,6 +159,15 @@ void updateMember() {
         pauseScreen();
         return;
     }
+
+    cout << "Current Name: " << found->name << "\n";
+    string newName;
+    if (stepString("Enter new name (or 'q' to cancel): ", newName) == InputResult::BACK) {
+        cout << "Update cancelled.\n";
+        pauseScreen();
+        return;
+    }
+    found->name = newName;
 
     cout << "Current Phone: " << found->phone << "\n";
     string newPhone;
@@ -205,8 +209,6 @@ void deleteMember() {
     pauseScreen();
 }
 
-/* Rental history shown by renter NAME, including how much each rental
-   actually cost - covers both booking and walk-in channel records. */
 void viewRentalHistory(const string& renterName) {
     vector<Rental> rentals = loadRentals();
     vector<BikeType> bikeTypes = loadBikeTypes();
@@ -236,8 +238,7 @@ void viewRentalHistory(const string& renterName) {
     pauseScreen();
 }
 
-/* Called by billing after payment - RM1 spent on the bike price = 1 point
-   (deposit is excluded from point calculation, per team requirement). */
+// after payment - RM1 spent on the bike price = 1 point
 void addPoints(int memberId, int amount) {
     vector<Member> members = loadMembers();
     Member* found = searchMemberById(members, memberId);
@@ -259,7 +260,42 @@ bool deductPoints(int memberId, int amount) {
     return true;
 }
 
-/* Admin-facing sub-menu: view/search/update/delete members + history lookup */
+int applyLoyaltyDiscount(int memberPoints, int& pointsUsedOut) {
+    pointsUsedOut = 0;
+
+    while (true) {
+        bool wantDiscount;
+        InputResult r = stepConfirm("Redeem loyalty points for a discount? (y/n): ", wantDiscount);
+        if (r == InputResult::BACK) return 0;
+        if (!wantDiscount) return 0;
+
+        printLine();
+        cout << "LOYALTY DISCOUNT TIERS (Your points: " << memberPoints << ")\n";
+        printLine();
+        for (int i = 0; i < NUM_DISCOUNT_TIERS; i++) {
+            cout << (i + 1) << ". " << discountPointsReq[i] << " points -> "
+                << discountPercentTable[i] << "% off rental price\n";
+        }
+        cout << "0. Skip discount\n";
+        printLine();
+
+        int tierChoice;
+        InputResult r2 = stepInt("Select tier: ", 0, NUM_DISCOUNT_TIERS, tierChoice);
+        if (r2 == InputResult::BACK) continue;   // re-ask "redeem?" from scratch
+        if (tierChoice == 0) return 0;
+
+        int reqPoints = discountPointsReq[tierChoice - 1];
+        if (reqPoints > memberPoints) {
+            cout << "Insufficient points for this tier (" << reqPoints << " needed, you have "
+                << memberPoints << "). Please choose again.\n";
+            continue;
+        }
+
+        pointsUsedOut = reqPoints;
+        return discountPercentTable[tierChoice - 1];
+    }
+}
+
 void memberA_menu() {
     int choice;
     do {
@@ -277,7 +313,7 @@ void memberA_menu() {
         switch (choice) {
         case 1: viewAllMembers(); break;
         case 2: searchMemberMenu(); break;
-        case 3: updateMember(); break;
+        case 3: modifyMember(); break;
         case 4: deleteMember(); break;
         case 5: {
             string name;

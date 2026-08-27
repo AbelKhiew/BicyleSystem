@@ -1,6 +1,5 @@
 /* ============================================================
-   memberC.cpp
-   MEMBER C - Return Processing & Billing / Payment Module
+   Return Processing & Billing / Payment Module
 
    Responsibilities:
    - Activate a "Pending" future-dated booking when the renter shows
@@ -14,8 +13,8 @@
      accounts only), based on day price only (deposit excluded)
    ============================================================ */
 #include "memberC.h"
-#include "memberA.h"     // addPoints()
-#include "memberB.h"     // searchBikeTypeById()
+#include "memberA.h"
+#include "memberB.h"
 #include <iostream>
 #include <iomanip>
 using namespace std;
@@ -58,11 +57,6 @@ void activateReservation() {
     pauseScreen();
 }
 
-/* Runs the condition/damage wizard for ONE unit. Sets the unit's
-   condition and damage flags directly. Returns false if the admin
-   backs out of the very first question (condition) for this unit -
-   the caller then moves back to the PREVIOUS unit instead, since
-   nothing is saved to disk until the whole return is finalised. */
 static bool processUnitWizard(RentalUnit& unit) {
     string cond = unit.condition == "-" ? "" : unit.condition;
     bool tyre = unit.tyreDamaged, brake = unit.brakeDamaged, chain = unit.chainDamaged;
@@ -70,7 +64,7 @@ static bool processUnitWizard(RentalUnit& unit) {
     int step = 0;
     while (step < 4) {
         if (step >= 1 && cond != "Damaged" && cond != "damaged") {
-            break;   // Good condition - no damage sub-questions needed
+            break;
         }
 
         InputResult res = InputResult::OK;
@@ -151,8 +145,6 @@ void processReturn() {
         return;
     }
 
-    /* On-time check: must be the same day as rentDate, before shop close.
-       Applied once for this whole return transaction (all units together). */
     string today = getCurrentDateString();
     int currentHour = getCurrentHour();
     bool onTime = (today == rental.rentDate) && (currentHour < SHOP_CLOSE_HOUR);
@@ -248,7 +240,7 @@ void processReturn() {
         rental.returnDate = today;
 
         if (rental.memberId != 0 && !rental.pointsAwarded) {
-            int pts = rental.quantity * (int)rental.pricePerDay;   // RM1/day/unit = 1 point
+            int pts = (int)(rental.quantity * rental.pricePerDay);   // RM1 = 1 point
             rental.pointsEarned = pts;
             rental.pointsAwarded = true;
             addPoints(rental.memberId, pts);
@@ -257,7 +249,7 @@ void processReturn() {
 
     saveRentals(rentals);
 
-    /* Receipt for this return transaction */
+    //Receipt for this return transaction
     printLine();
     cout << "RETURN RECEIPT - Rental " << rental.code << " (" << bikeType->type << ")\n";
     printLine();
@@ -332,16 +324,14 @@ void memberC_menu() {
         printLine();
         cout << "RETURN PROCESSING & BILLING (ADMIN)\n";
         printLine();
-        cout << "1. Activate Reservation (future bookings)\n";
-        cout << "2. Process Bike Return\n";
-        cout << "3. View Rental Record / Receipt\n";
+        cout << "1. Process Bike Return\n";
+        cout << "2. View Rental Record / Receipt\n";
         cout << "0. Back to Main Menu\n";
-        choice = getValidatedInt("Enter choice: ", 0, 3);
+        choice = getValidatedInt("Enter choice: ", 0, 2);
 
         switch (choice) {
-        case 1: activateReservation(); break;
-        case 2: processReturn(); break;
-        case 3: viewReceiptMenu(); break;
+        case 1: processReturn(); break;
+        case 2: viewReceiptMenu(); break;
         case 0: cout << "Returning to main menu...\n"; break;
         }
     } while (choice != 0);

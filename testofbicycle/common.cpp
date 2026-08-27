@@ -1,14 +1,7 @@
 /* ============================================================
-   common.cpp
    Implementation of the hand-written JSON engine, shared file
    I/O, date handling, and input validation utilities.
    TEAM COMPONENT - Shared data management
-
-   NOTE ON JSON: This project stores data as real, valid JSON.
-   Since the course syllabus (Chapters 1-6) does not cover
-   external libraries, this file implements a small JSON
-   reader/writer using only <fstream> and <sstream> - no
-   third-party library is required to compile or run this.
    ============================================================ */
 #include "common.h"
 #include <iostream>
@@ -246,7 +239,6 @@ JsonValue parseJson(const string& text) {
     return parser.parseValue();
 }
 
-/* ---------------- Raw file read/write helpers (fstream only) ---------------- */
 static string readFileText(const string& filename) {
     ifstream fin(filename);
     if (!fin.good()) return "";
@@ -261,7 +253,6 @@ static void writeFileText(const string& filename, const string& content) {
     fout.close();
 }
 
-/* ---------------- First-run file creation ---------------- */
 void ensureDataFilesExist() {
     const string files[] = { MEMBERS_FILE, BIKETYPES_FILE, RENTALS_FILE };
     for (const auto& filename : files) {
@@ -371,6 +362,8 @@ vector<Rental> loadRentals() {
         r.code = obj.getStr("code");
         r.pricePerDay = obj.getNum("pricePerDay");
         r.depositPerUnit = obj.getNum("depositPerUnit");
+        r.discountApplied = obj.getInt("discountApplied", 0);
+        r.discountPointsUsed = obj.getInt("discountPointsUsed", 0);
         r.totalPaid = obj.getNum("totalPaid");
         r.paymentMethod = obj.getStr("paymentMethod");
         r.status = obj.getStr("status", "Active");
@@ -412,6 +405,8 @@ void saveRentals(const vector<Rental>& rentals) {
         obj.set("code", JsonValue::makeString(r.code));
         obj.set("pricePerDay", JsonValue::makeNumber(r.pricePerDay));
         obj.set("depositPerUnit", JsonValue::makeNumber(r.depositPerUnit));
+        obj.set("discountApplied", JsonValue::makeNumber(r.discountApplied));
+        obj.set("discountPointsUsed", JsonValue::makeNumber(r.discountPointsUsed));
         obj.set("totalPaid", JsonValue::makeNumber(r.totalPaid));
         obj.set("paymentMethod", JsonValue::makeString(r.paymentMethod));
         obj.set("status", JsonValue::makeString(r.status));
@@ -440,7 +435,7 @@ void saveRentals(const vector<Rental>& rentals) {
     writeFileText(RENTALS_FILE, arr.dump());
 }
 
-/* ---------------- ID generation utilities ---------------- */
+// id generation utilitie
 int getNextMemberId(const vector<Member>& members) {
     int maxId = 0;
     for (const auto& m : members) if (m.id > maxId) maxId = m.id;
@@ -491,11 +486,9 @@ string getCurrentDateString() {
 }
 
 bool isDateBeforeToday(const string& dateStr) {
-    return dateStr < getCurrentDateString();   // safe since format is zero-padded YYYY-MM-DD
+    return dateStr < getCurrentDateString();
 }
 
-/* Real calendar validation: checks month range, day range for that
-   month, and leap years for February - catches things like 2029-90-90. */
 bool isValidCalendarDate(int year, int month, int day) {
     if (year < 2000 || year > 2100) return false;
     if (month < 1 || month > 12) return false;
@@ -508,7 +501,7 @@ bool isValidCalendarDate(int year, int month, int day) {
     return day <= daysInMonth[month - 1];
 }
 
-/* ---------------- Input validation utilities ---------------- */
+// Input validation utilities
 int getValidatedInt(const string& prompt, int minVal, int maxVal) {
     int value;
     while (true) {
@@ -551,9 +544,7 @@ string getValidatedString(const string& prompt) {
     }
 }
 
-/* Accepts 't'/'T' as shorthand for today, or a full YYYY-MM-DD date.
-   Validates real calendar structure (correct month/day ranges, leap
-   years) and rejects dates before today - re-prompts on any failure. */
+// Accepts 't'/'T' as shorthand for today, or a full YYYY-MM-DD date
 string getValidatedDate(const string& prompt) {
     while (true) {
         string value = getValidatedString(prompt);
@@ -590,8 +581,7 @@ string getValidatedDate(const string& prompt) {
     }
 }
 
-/* ---------------- Display utilities ---------------- */
-/* ---------------- Wizard-style step input ('q' = go back) ---------------- */
+
 static bool isQuit(const string& input) {
     return input == "q" || input == "Q";
 }

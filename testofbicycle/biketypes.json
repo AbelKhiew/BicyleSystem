@@ -2,25 +2,25 @@
   {
     "id": 1,
     "type": "normal bicycle",
-    "pricePerDay": 20,
-    "tyreCost": 10,
-    "brakeCost": 6,
+    "pricePerDay": 5,
+    "tyreCost": 5,
+    "brakeCost": 5,
     "chainCost": 5,
-    "deposit": 41,
-    "bookingQuantity": 14,
-    "walkinQuantity": 28,
-    "timesRented": 10
+    "deposit": 35,
+    "bookingQuantity": 49,
+    "walkinQuantity": 50,
+    "timesRented": 15
   },
   {
     "id": 2,
-    "type": "1",
-    "pricePerDay": 12,
-    "tyreCost": 12,
-    "brakeCost": 12,
-    "chainCost": 12,
-    "deposit": 56,
-    "bookingQuantity": 12,
-    "walkinQuantity": 12,
-    "timesRented": 0
+    "type": "456",
+    "pricePerDay": 10,
+    "tyreCost": 150,
+    "brakeCost": 500,
+    "chainCost": 500,
+    "deposit": 1170,
+    "bookingQuantity": 50,
+    "walkinQuantity": 50,
+    "timesRented": 3
   }
 ]

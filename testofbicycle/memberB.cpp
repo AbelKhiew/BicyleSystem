@@ -1,6 +1,5 @@
 /* ============================================================
-   memberB.cpp
-   MEMBER B - Bicycle Inventory & Rental Booking Module
+    Bicycle Inventory & Rental Booking Module
 
    Responsibilities:
    - Bike inventory by TYPE (quantity pools, price/day, damage-part
@@ -19,7 +18,7 @@
      personally handing the bike(s) over at the counter.
    ============================================================ */
 #include "memberB.h"
-#include "memberA.h"     // searchMemberByName() - link walk-in to an existing account
+#include "memberA.h"
 #include <iostream>
 #include <iomanip>
 using namespace std;
@@ -29,12 +28,12 @@ BikeType* searchBikeTypeById(vector<BikeType>& bikeTypes, int id) {
     return nullptr;
 }
 
-/* Deposit = tyre repair cost + brake repair cost + chain repair cost + RM20 buffer */
+// Deposit = tyre repair cost + brake repair cost + chain repair cost + RM20 buffer
 double calcDeposit(double tyreCost, double brakeCost, double chainCost) {
     return tyreCost + brakeCost + chainCost + 20.0;
 }
 
-/* ---------------- Admin: inventory management ---------------- */
+//Admin: inventory management
 void addBikeType() {
     printLine();
     cout << "ADD NEW BIKE TYPE (type 'q' at any prompt to go back)\n";
@@ -155,8 +154,7 @@ void editBikeType() {
     pauseScreen();
 }
 
-/* Deletes a bike type entirely. Blocked if any non-Return rental still
-   references this type, to avoid breaking active/pending transactions. */
+//Deletes a bike type entirely. Blocked if any non-Return
 void deleteBikeType() {
     vector<BikeType> bikeTypes = loadBikeTypes();
     viewBikeTypes();
@@ -225,7 +223,7 @@ void viewBikeTypes() {
     pauseScreen();
 }
 
-/* Renter-facing simplified availability view. */
+// Renter-facing simplified availability view
 void viewAvailability() {
     vector<BikeType> bikeTypes = loadBikeTypes();
     printLine();
@@ -245,17 +243,40 @@ void viewAvailability() {
         }
     }
     printLine();
-    pauseScreen();
 }
 
-/* Shared payment collection + receipt printer.
-   isWalkIn = true  -> Cash / Card / QR Code  (Cash asks amount given + shows change)
-   isWalkIn = false -> QR Payment / Bank Transfer (renter self-service)          */
-   /* Shared payment collection + receipt printer.
-      Returns false if the admin/renter cancels payment with 'q' (nothing
-      is saved by the caller in that case); true if payment completed.
-      isWalkIn = true  -> Cash / Card / QR Code  (Cash asks amount given + shows change)
-      isWalkIn = false -> QR Payment / Bank Transfer (renter self-service)          */
+void printInvoicePreview(const string& renterName, const string& bikeTypeName, int quantity,
+    double pricePerDay, const string& rentDate, double subtotalPrice,
+    double depositTotal, int discountPercent, double discountAmount,
+    double total, bool isWalkIn) {
+
+    printLine();
+    cout << "INVOICE PREVIEW\n";
+    cout << "Deposit include damage tyre, damage chain, damage\n";
+   
+    printLine();
+    cout << fixed << setprecision(2);
+
+    if (isWalkIn) {
+        cout << left << setw(22) << "Renter Name:" << renterName << "\n";
+    }
+
+    cout << left << setw(22) << "Bike Type:" << bikeTypeName << "\n";
+    cout << left << setw(22) << "Quantity:" << quantity << "\n";
+    cout << left << setw(22) << "Price/day:" << "RM" << pricePerDay << "\n";
+    cout << left << setw(22) << "Deposit:" << "RM" << depositTotal << "\n";
+    cout << left << setw(22) << "Rental Date:" << rentDate << (isWalkIn ? " (today)\n" : "\n");
+    cout << left << setw(22) << "Price/day x Qty:" << "RM" << subtotalPrice << "\n";
+
+    if (discountPercent > 0) {
+        cout << left << setw(22) << "Loyalty Discount:" << discountPercent << "% (-RM" << discountAmount << ")\n";
+    }
+
+    cout << left << setw(22) << "Deposit x Qty:" << "RM" << depositTotal << "\n";
+    cout << left << setw(22) << "TOTAL TO PAY:" << "RM" << total << "\n";
+    printLine();
+}
+
 bool collectPaymentAndReceipt(const string& renterName, const string& bikeTypeName,
     int quantity, const string& rentDate, double totalDue,
     const string& code, bool isWalkIn, string& paymentMethodOut) {
@@ -316,7 +337,7 @@ bool collectPaymentAndReceipt(const string& renterName, const string& bikeTypeNa
     return true;
 }
 
-/* ---------------- Renter self-service booking (single flow) ---------------- */
+//Renter self-service booking
 void bookBike(int memberId, const string& renterName) {
     printLine();
     cout << "BOOK A BICYCLE (type 'q' at any prompt to go back)\n";
@@ -325,14 +346,19 @@ void bookBike(int memberId, const string& renterName) {
     vector<BikeType> bikeTypes = loadBikeTypes();
     viewAvailability();
 
+    vector<Member> members = loadMembers();
+    Member* member = searchMemberById(members, memberId);
+    int memberPoints = (member != nullptr) ? member->points : 0;
+
     int typeId = 0, quantity = 0;
     string rentDate;
     bool confirm = false;
     BikeType* bikeType = nullptr;
-    double total = 0.0;
+    int discountPercent = 0, pointsUsed = 0;
+    double subtotalPrice = 0.0, depositTotal = 0.0, discountAmount = 0.0, total = 0.0;
 
     int step = 0;
-    while (step < 4) {
+    while (step < 5) {
         InputResult res = InputResult::OK;
         switch (step) {
         case 0:
@@ -358,20 +384,21 @@ void bookBike(int memberId, const string& renterName) {
         case 2:
             res = stepDate("Enter rental date (YYYY-MM-DD, or 't' for today): ", rentDate);
             break;
-        case 3: {
-            total = quantity * (bikeType->pricePerDay + bikeType->deposit);
-            printLine();
-            cout << "INVOICE PREVIEW\n";
-            printLine();
-            cout << fixed << setprecision(2);
-            cout << left << setw(22) << "Bike Type:" << bikeType->type << "\n";
-            cout << left << setw(22) << "Quantity:" << quantity << "\n";
-            cout << left << setw(22) << "Rental Date:" << rentDate << "\n";
-            cout << left << setw(22) << "Price/day x Qty:" << "RM" << (bikeType->pricePerDay * quantity) << "\n";
-            cout << left << setw(22) << "Deposit x Qty:" << "RM" << (bikeType->deposit * quantity) << "\n";
-            cout << left << setw(22) << "TOTAL TO PAY:" << "RM" << total << "\n";
-            printLine();
-            res = stepConfirm("Confirm booking? (y/n, or 'q' to go back): ", confirm);
+        case 3:
+            discountPercent = applyLoyaltyDiscount(memberPoints, pointsUsed);
+            res = InputResult::OK;
+            break;
+        case 4: {
+            subtotalPrice = quantity * bikeType->pricePerDay;
+            depositTotal = quantity * bikeType->deposit;
+            discountAmount = subtotalPrice * discountPercent / 100.0;
+            total = (subtotalPrice - discountAmount) + depositTotal;
+
+            printInvoicePreview("", bikeType->type, quantity, bikeType->pricePerDay,
+                rentDate, subtotalPrice, depositTotal, discountPercent,
+                discountAmount, total, false);
+
+            res = stepConfirm("Confirm booking? (y/n): ", confirm);
             break;
         }
         }
@@ -403,14 +430,15 @@ void bookBike(int memberId, const string& renterName) {
         return;
     }
 
-    /* Deduct from booking pool, increment stats */
+    if (pointsUsed > 0) {
+        deductPoints(memberId, pointsUsed);
+    }
+
     bikeType->bookingQuantity -= quantity;
     bikeType->timesRented += quantity;
     saveBikeTypes(bikeTypes);
 
-    /* EVERY self-booking starts Pending, regardless of date - it only
-       becomes Active once the renter shows this code at the counter
-       and admin activates it (confirms the bike has been picked up). */
+    //save data to json
     vector<Rental> rentals = loadRentals();
     Rental newRental;
     newRental.rentalId = getNextRentalId(rentals);
@@ -423,6 +451,8 @@ void bookBike(int memberId, const string& renterName) {
     newRental.code = code;
     newRental.pricePerDay = bikeType->pricePerDay;
     newRental.depositPerUnit = bikeType->deposit;
+    newRental.discountApplied = discountPercent;
+    newRental.discountPointsUsed = pointsUsed;
     newRental.totalPaid = total;
     newRental.paymentMethod = paymentMethod;
     newRental.status = "Pending";
@@ -444,18 +474,17 @@ void bookBike(int memberId, const string& renterName) {
     pauseScreen();
 }
 
-/* ---------------- Admin walk-in rental (separate quantity pool) ---------------- */
+//Admin walk-in rental
 void walkInRental() {
     printLine();
     cout << "WALK-IN RENTAL (ADMIN) - type 'q' at any prompt to go back\n";
     printLine();
 
     int linkedMemberId = 0;
+    int linkedMemberPoints = 0;
     string renterName;
     bool hasAccount = false;
 
-    /* Step 0: does the customer have an account? Step 1: resolve their
-       name (either linked account lookup, or a fresh guest name).      */
     int nameStep = 0;
     while (nameStep < 2) {
         InputResult res = InputResult::OK;
@@ -477,13 +506,14 @@ void walkInRental() {
                     string guestName;
                     InputResult r2 = stepString("Enter renter's name: ", guestName);
                     if (r2 == InputResult::BACK) {
-                        res = InputResult::BACK;   // re-ask account name
+                        res = InputResult::BACK;
                         break;
                     }
                     renterName = guestName;
                 }
                 else {
                     linkedMemberId = found->id;
+                    linkedMemberPoints = found->points;
                     renterName = found->name;
                     cout << "Account linked: " << renterName << " (Points balance: " << found->points << ")\n";
                 }
@@ -520,10 +550,12 @@ void walkInRental() {
     printLine();
 
     int typeId = 0, quantity = 0;
+    int discountPercent = 0, pointsUsed = 0;
     BikeType* bikeType = nullptr;
 
     int step = 0;
-    while (step < 2) {
+    int totalSteps = (linkedMemberId != 0) ? 3 : 2;
+    while (step < totalSteps) {
         InputResult res = InputResult::OK;
         switch (step) {
         case 0:
@@ -546,6 +578,10 @@ void walkInRental() {
             res = stepInt("Enter quantity to rent (1-" + to_string(bikeType->walkinQuantity) + "): ",
                 1, bikeType->walkinQuantity, quantity);
             break;
+        case 2:
+            discountPercent = applyLoyaltyDiscount(linkedMemberPoints, pointsUsed);
+            res = InputResult::OK;
+            break;
         }
 
         if (res == InputResult::BACK) {
@@ -561,21 +597,15 @@ void walkInRental() {
         }
     }
 
-    string rentDate = getCurrentDateString();   // walk-in is always for today
-    double total = quantity * (bikeType->pricePerDay + bikeType->deposit);
+    string rentDate = getCurrentDateString();
+    double subtotalPrice = quantity * bikeType->pricePerDay;
+    double depositTotal = quantity * bikeType->deposit;
+    double discountAmount = subtotalPrice * discountPercent / 100.0;
+    double total = (subtotalPrice - discountAmount) + depositTotal;
 
-    printLine();
-    cout << "INVOICE PREVIEW\n";
-    printLine();
-    cout << fixed << setprecision(2);
-    cout << left << setw(22) << "Renter Name:" << renterName << "\n";
-    cout << left << setw(22) << "Bike Type:" << bikeType->type << "\n";
-    cout << left << setw(22) << "Quantity:" << quantity << "\n";
-    cout << left << setw(22) << "Rental Date:" << rentDate << " (today)\n";
-    cout << left << setw(22) << "Price/day x Qty:" << "RM" << (bikeType->pricePerDay * quantity) << "\n";
-    cout << left << setw(22) << "Deposit x Qty:" << "RM" << (bikeType->deposit * quantity) << "\n";
-    cout << left << setw(22) << "TOTAL TO PAY:" << "RM" << total << "\n";
-    printLine();
+    printInvoicePreview(renterName, bikeType->type, quantity, bikeType->pricePerDay,
+        rentDate, subtotalPrice, depositTotal, discountPercent,
+        discountAmount, total, true);
 
     string code = generateReservationCode();
     string paymentMethod;
@@ -585,13 +615,14 @@ void walkInRental() {
         return;
     }
 
+    if (pointsUsed > 0) {
+        deductPoints(linkedMemberId, pointsUsed);
+    }
+
     bikeType->walkinQuantity -= quantity;
     bikeType->timesRented += quantity;
     saveBikeTypes(bikeTypes);
 
-    /* Walk-in rentals start Active immediately - admin is personally
-       handing the bike(s) to the customer at the counter right now,
-       so there is no separate activation step needed. */
     vector<Rental> rentals = loadRentals();
     Rental newRental;
     newRental.rentalId = getNextRentalId(rentals);
@@ -604,6 +635,8 @@ void walkInRental() {
     newRental.code = code;
     newRental.pricePerDay = bikeType->pricePerDay;
     newRental.depositPerUnit = bikeType->deposit;
+    newRental.discountApplied = discountPercent;
+    newRental.discountPointsUsed = pointsUsed;
     newRental.totalPaid = total;
     newRental.paymentMethod = paymentMethod;
     newRental.status = "Active";
@@ -622,8 +655,6 @@ void walkInRental() {
     pauseScreen();
 }
 
-/* Admin menu: inventory management ONLY (booking is renter self-service,
-   walk-in rental has its own top-level admin menu entry - see main.cpp). */
 void memberB_menu() {
     int choice;
     do {
