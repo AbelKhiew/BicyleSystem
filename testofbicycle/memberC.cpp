@@ -63,6 +63,7 @@ static bool processUnitWizard(RentalUnit& unit) {
 
     int step = 0;
     while (step < 4) {
+        // Skip damage questions if Good or Lost
         if (step >= 1 && cond != "Damaged" && cond != "damaged") {
             break;
         }
@@ -71,10 +72,13 @@ static bool processUnitWizard(RentalUnit& unit) {
         switch (step) {
         case 0:
             while (true) {
-                res = stepString("  Condition (Good/Damaged): ", cond);
+                res = stepString("  Condition (Good/Damaged/Lost): ", cond);
                 if (res == InputResult::BACK) break;
-                if (cond != "Good" && cond != "good" && cond != "Damaged" && cond != "damaged") {
-                    cout << "  Please enter 'Good' or 'Damaged' (or 'q' to go back).\n";
+
+                if (cond != "Good" && cond != "good" &&
+                    cond != "Damaged" && cond != "damaged" &&
+                    cond != "Lost" && cond != "lost") {
+                    cout << "  Please enter 'Good', 'Damaged', or 'Lost' (or 'q' to go back).\n";
                     continue;
                 }
                 break;
@@ -149,10 +153,11 @@ void processReturn() {
     int currentHour = getCurrentHour();
     bool onTime = (today == rental.rentDate) && (currentHour < SHOP_CLOSE_HOUR);
 
+    // UPDATED: Notice now reflects the RM20 penalty instead of full forfeiture
     if (!onTime) {
         cout << "\nNOTICE: This return is LATE (after " << SHOP_CLOSE_HOUR
             << ":00 on the rental date, or a different day).\n";
-        cout << "Deposit will be FULLY FORFEITED for every unit, regardless of condition.\n\n";
+        cout << "An RM20 late penalty will be deducted from the deposit for every unit.\n\n";
     }
 
     vector<int> pendingIndices;
@@ -190,38 +195,47 @@ void processReturn() {
     /* All pending units now have condition/damage recorded - compute
        refunds and finalise. */
     int unitsReturnedNow = 0;
+    int unitsLostNow = 0;
     double totalRefund = 0.0;
 
     for (int idx : pendingIndices) {
         RentalUnit& unit = rental.units[idx];
         double damageCost = 0.0;
+
         if (unit.condition == "Damaged" || unit.condition == "damaged") {
             if (unit.tyreDamaged)  damageCost += bikeType->tyreCost;
             if (unit.brakeDamaged) damageCost += bikeType->brakeCost;
             if (unit.chainDamaged) damageCost += bikeType->chainCost;
         }
+        else if (unit.condition == "Lost" || unit.condition == "lost") {
+            damageCost = rental.depositPerUnit; // Total loss essentially equals the whole deposit
+        }
+
         unit.damageCost = damageCost;
         unit.returnedOnTime = onTime;
 
-        double refund;
-        if (!onTime) {
-            refund = 0.0;
-        }
-        else if (unit.condition == "Damaged" || unit.condition == "damaged") {
-            refund = rental.depositPerUnit - damageCost;
-            if (refund < 0) refund = 0;
+        double refund = 0.0;
+
+        // UPDATED REFUND LOGIC
+        if (unit.condition == "Lost" || unit.condition == "lost") {
+            refund = 0.0;           // Lost bike = 0 refund
+            unitsLostNow++;         // Keep track of lost bikes to exclude from inventory return
         }
         else {
-            refund = rental.depositPerUnit;
+            double latePenalty = onTime ? 0.0 : 20.0;
+            refund = rental.depositPerUnit - damageCost - latePenalty;
+            if (refund < 0) refund = 0.0; // Prevent negative refund
+            unitsReturnedNow++;     // Bike successfully physically returned
         }
+
         unit.depositRefunded = refund;
         unit.isReturned = true;
 
         totalRefund += refund;
-        unitsReturnedNow++;
     }
 
-    /* Restore returned units to the correct quantity pool */
+    /* Restore returned units to the correct quantity pool
+       (NOTE: unitsLostNow are deliberately NOT added back to inventory) */
     if (rental.channel == "Booking") {
         bikeType->bookingQuantity += unitsReturnedNow;
     }
@@ -255,7 +269,7 @@ void processReturn() {
     printLine();
     cout << fixed << setprecision(2);
     cout << left << setw(24) << "Renter:" << rental.renterName << "\n";
-    cout << left << setw(24) << "Returned On Time:" << (onTime ? "Yes" : "No (LATE)") << "\n";
+    cout << left << setw(24) << "Returned On Time:" << (onTime ? "Yes" : "No (LATE - RM20 Fee)") << "\n";
     printLine();
     for (const auto& unit : rental.units) {
         if (unit.unitIndex == 0) continue;

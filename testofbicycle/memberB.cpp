@@ -248,32 +248,51 @@ void viewAvailability() {
 void printInvoicePreview(const string& renterName, const string& bikeTypeName, int quantity,
     double pricePerDay, const string& rentDate, double subtotalPrice,
     double depositTotal, int discountPercent, double discountAmount,
-    double total, bool isWalkIn) {
+    double total, bool isWalkIn, double tyreCost, double brakeCost, double chainCost) {
 
+    // 1. HEADER
     printLine();
-    cout << "INVOICE PREVIEW\n";
-    cout << "Deposit include damage tyre, damage chain, damage\n";
-   
+    cout << "                    INVOICE PREVIEW\n";
     printLine();
     cout << fixed << setprecision(2);
 
+    // 2. RENTAL DETAILS
     if (isWalkIn) {
-        cout << left << setw(22) << "Renter Name:" << renterName << "\n";
+        cout << left << setw(25) << "Renter Name:" << renterName << "\n";
     }
+    cout << left << setw(25) << "Rental Date:" << rentDate << (isWalkIn ? " (today)\n" : "\n");
+    cout << left << setw(25) << "Bike Type:" << bikeTypeName << "\n";
+    cout << left << setw(25) << "Quantity:" << quantity << " unit(s)\n";
+    printLine();
 
-    cout << left << setw(22) << "Bike Type:" << bikeTypeName << "\n";
-    cout << left << setw(22) << "Quantity:" << quantity << "\n";
-    cout << left << setw(22) << "Price/day:" << "RM" << pricePerDay << "\n";
-    cout << left << setw(22) << "Deposit:" << "RM" << depositTotal << "\n";
-    cout << left << setw(22) << "Rental Date:" << rentDate << (isWalkIn ? " (today)\n" : "\n");
-    cout << left << setw(22) << "Price/day x Qty:" << "RM" << subtotalPrice << "\n";
+    // 3. ITEMISED COSTS
+    double depositPerUnit = (quantity > 0) ? (depositTotal / quantity) : 0.0;
 
+    cout << left << setw(25) << "Price (per day):" << "RM " << pricePerDay << "\n";
+    cout << left << setw(25) << "Deposit (per unit):" << "RM " << depositPerUnit << "\n";
+
+    // Deposit Breakdown (Indented for readability)
+    cout << "  " << left << setw(23) << "- Tyre Coverage:" << "RM " << tyreCost << "\n";
+    cout << "  " << left << setw(23) << "- Brake Coverage:" << "RM " << brakeCost << "\n";
+    cout << "  " << left << setw(23) << "- Chain Coverage:" << "RM " << chainCost << "\n";
+    cout << "  " << left << setw(23) << "- Base Fee:" << "RM 20.00\n";
+    cout << "\n";
+
+    cout << left << setw(25) << "Rental Subtotal:" << "RM " << subtotalPrice << "\n";
     if (discountPercent > 0) {
-        cout << left << setw(22) << "Loyalty Discount:" << discountPercent << "% (-RM" << discountAmount << ")\n";
+        cout << left << setw(25) << ("Discount (" + to_string(discountPercent) + "%):")
+            << "-RM " << discountAmount << "\n";
     }
+    cout << left << setw(25) << "Deposit Total:" << "RM " << depositTotal << "\n";
+    printLine();
 
-    cout << left << setw(22) << "Deposit x Qty:" << "RM" << depositTotal << "\n";
-    cout << left << setw(22) << "TOTAL TO PAY:" << "RM" << total << "\n";
+    // 4. FINAL TOTAL
+    cout << left << setw(25) << "TOTAL TO PAY:" << "RM " << total << "\n";
+    printLine();
+
+    // 5. FOOTER NOTE
+    cout << "* Note: Deposit is fully refundable upon on-time return\n";
+    cout << "        without any damage to the bicycle.\n";
     printLine();
 }
 
@@ -396,7 +415,8 @@ void bookBike(int memberId, const string& renterName) {
 
             printInvoicePreview("", bikeType->type, quantity, bikeType->pricePerDay,
                 rentDate, subtotalPrice, depositTotal, discountPercent,
-                discountAmount, total, false);
+                discountAmount, total, false, bikeType->tyreCost,
+                bikeType->brakeCost, bikeType->chainCost);
 
             res = stepConfirm("Confirm booking? (y/n): ", confirm);
             break;
@@ -603,9 +623,10 @@ void walkInRental() {
     double discountAmount = subtotalPrice * discountPercent / 100.0;
     double total = (subtotalPrice - discountAmount) + depositTotal;
 
-    printInvoicePreview(renterName, bikeType->type, quantity, bikeType->pricePerDay,
+    printInvoicePreview("", bikeType->type, quantity, bikeType->pricePerDay,
         rentDate, subtotalPrice, depositTotal, discountPercent,
-        discountAmount, total, true);
+        discountAmount, total, false, bikeType->tyreCost,
+        bikeType->brakeCost, bikeType->chainCost);
 
     string code = generateReservationCode();
     string paymentMethod;

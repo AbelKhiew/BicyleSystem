@@ -10,7 +10,6 @@ void memberC_menu();
 
 void processReturn();
 void printReceipt(const Rental& rental, const string& bikeTypeName);
-void viewReceiptMenu();
 void activateReservation();
 
 #endif
