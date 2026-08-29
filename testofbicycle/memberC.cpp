@@ -1,17 +1,14 @@
-/* ============================================================
-   Return Processing & Billing / Payment Module
+/*==================================================================
+  memberC.cpp  -  Member C: Return Processing & Billing
 
-   Responsibilities:
-   - Activate a "Pending" future-dated booking when the renter shows
-     up and tells the admin the reservation code
-   - Process the return of a rental: checks on-time (same day, before
-     shop close); admin records EACH unit's condition individually
-     (multiple damaged parts per unit allowed); refund computed per
-     unit and summed
-   - Restore returned units to the correct quantity pool
-   - Award loyalty points once, when ALL units are back (linked
-     accounts only), based on day price only (deposit excluded)
-   ============================================================ */
+  what this file does:
+  - activateReservation(): Pending booking -> Active when the
+    renter shows the code at the counter
+  - processReturn(): the big one. work out if it is late, ask the
+    condition of each bike, work out each refund, put bikes back
+    in stock, and (once every bike is back) give loyalty points
+  - viewReceiptMenu(): look up any rental by its code
+==================================================================*/
 #include "memberC.h"
 #include "memberA.h"
 #include "memberB.h"
@@ -19,51 +16,61 @@
 #include <iomanip>
 using namespace std;
 
-/* Admin activates a future-dated ("Pending") booking once the renter
-   arrives and provides the reservation code. */
+/*==================================================================
+  this method turns a "Pending" booking into "Active". the renter
+  gives the reservation code; if it is found and still Pending we
+  flip it so they can collect the bikes
+==================================================================*/
 void activateReservation() {
-    printLine();
-    cout << "ACTIVATE RESERVATION\n";
-    printLine();
+    uiHeader("ACTIVATE RESERVATION");
 
     vector<Rental> rentals = loadRentals();
     string code;
     if (stepString("Enter reservation code (or 'q' to cancel): ", code) == InputResult::BACK) {
-        cout << "Cancelled.\n";
+        cout << "\nOperation cancelled.\n";
         pauseScreen();
         return;
     }
 
+    // find the rental with this code
     Rental* found = nullptr;
     for (auto& r : rentals) {
         if (r.code == code) { found = &r; break; }
     }
 
     if (found == nullptr) {
-        cout << "No reservation found with this code.\n";
+        cout << "\nNo reservation matches that code.\n";
     }
     else if (found->status == "Active") {
-        cout << "This reservation is already active.\n";
+        cout << "\nThis reservation is already active.\n";
     }
     else if (found->status == "Return") {
-        cout << "This reservation has already been returned.\n";
+        cout << "\nThis reservation has already been completed and returned.\n";
     }
     else {
         found->status = "Active";
         saveRentals(rentals);
-        cout << "Reservation activated! " << found->renterName << " (" << found->quantity
-            << "x bike) may now collect their bike(s).\n";
+        cout << "\nReservation " << found->code << " activated successfully.\n";
+        cout << "  Renter               : " << found->renterName << "\n";
+        cout << "  Units to collect     : " << found->quantity << "\n";
+        cout << "  Return on or before  : " << found->dueDate << " (by "
+            << SHOP_CLOSE_HOUR << ":00)\n";
     }
     pauseScreen();
 }
 
+/*==================================================================
+  this method asks the admin about ONE bike being returned:
+  Good or Damaged, and (if Damaged) which parts. 'q' steps back.
+  returns false if the admin backed all the way out of this bike
+==================================================================*/
 static bool processUnitWizard(RentalUnit& unit) {
     string cond = unit.condition == "-" ? "" : unit.condition;
     bool tyre = unit.tyreDamaged, brake = unit.brakeDamaged, chain = unit.chainDamaged;
 
     int step = 0;
     while (step < 4) {
-        // Skip damage questions if Good or Lost
+        // if it is "Good", skip the tyre/brake/chain questions
         if (step >= 1 && cond != "Damaged" && cond != "damaged") {
             break;
         }
@@ -72,13 +79,10 @@ static bool processUnitWizard(RentalUnit& unit) {
         switch (step) {
         case 0:
             while (true) {
-                res = stepString("  Condition (Good/Damaged/Lost): ", cond);
+                res = stepString("  Condition (Good/Damaged): ", cond);
                 if (res == InputResult::BACK) break;
-
-                if (cond != "Good" && cond != "good" &&
-                    cond != "Damaged" && cond != "damaged" &&
-                    cond != "Lost" && cond != "lost") {
-                    cout << "  Please enter 'Good', 'Damaged', or 'Lost' (or 'q' to go back).\n";
+                if (cond != "Good" && cond != "good" && cond != "Damaged" && cond != "damaged") {
+                    cout << "  Please enter 'Good' or 'Damaged' (or 'q' to go back).\n";
                     continue;
                 }
                 break;
@@ -98,80 +102,104 @@ static bool processUnitWizard(RentalUnit& unit) {
         }
     }
 
-    unit.condition = cond;
+    // tidy the capitalisation and copy the answers into the unit
+    unit.condition = (cond == "good") ? "Good" : (cond == "damaged") ? "Damaged" : cond;
     unit.tyreDamaged = tyre;
     unit.brakeDamaged = brake;
     unit.chainDamaged = chain;
     return true;
 }
 
+/*==================================================================
+  this method processes a bike return from start to finish:
+  1. find the rental by code, check it is "Active"
+  2. decide if it is late  (later than the due date, or on the
+     due date after the shop closes)
+  3. ask the condition of every bike not yet back
+  4. work out each refund:
+       late            -> RM0
+       damaged         -> deposit minus the damaged parts' cost
+       good & on time  -> full deposit
+  5. put the bikes back in stock
+  6. if every bike is now back: mark "Return", and give loyalty
+     points once (linked accounts only)
+  7. print the return receipt
+==================================================================*/
 void processReturn() {
-    printLine();
-    cout << "PROCESS BIKE RETURN\n";
-    printLine();
+    uiHeader("PROCESS BIKE RETURN");
 
     vector<Rental> rentals = loadRentals();
     string code;
     if (stepString("Enter reservation/reference code (or 'q' to cancel): ", code) == InputResult::BACK) {
-        cout << "Cancelled.\n";
+        cout << "\nOperation cancelled.\n";
         pauseScreen();
         return;
     }
 
+    // 1) find the rental
     Rental* rentalPtr = nullptr;
     for (auto& r : rentals) {
         if (r.code == code) { rentalPtr = &r; break; }
     }
 
     if (rentalPtr == nullptr) {
-        cout << "No rental found with this code.\n";
+        cout << "\nNo rental record matches that code.\n";
         pauseScreen();
         return;
     }
     Rental& rental = *rentalPtr;
 
+    // must be "Active" - not still Pending, not already Returned
     if (rental.status == "Pending") {
-        cout << "This reservation has not been activated yet. Please activate it first.\n";
+        cout << "\nThis reservation has not been activated yet. Please activate it before processing a return.\n";
         pauseScreen();
         return;
     }
     if (rental.status == "Return") {
-        cout << "This rental has already been fully returned.\n";
+        cout << "\nThis rental has already been fully returned.\n";
         pauseScreen();
         return;
     }
 
+    // need the bike type for its repair costs + to put stock back
     vector<BikeType> bikeTypes = loadBikeTypes();
     BikeType* bikeType = searchBikeTypeById(bikeTypes, rental.bikeTypeId);
     if (bikeType == nullptr) {
-        cout << "Associated bike type not found. Data error.\n";
+        cout << "\nError: the bike type linked to this rental could not be found in the inventory.\n";
         pauseScreen();
         return;
     }
 
+    // 2) late?  late = after the due date, OR on the due date after closing time
     string today = getCurrentDateString();
     int currentHour = getCurrentHour();
-    bool onTime = (today == rental.rentDate) && (currentHour < SHOP_CLOSE_HOUR);
+    string dueRef = rental.dueDate.empty() ? rental.rentDate : rental.dueDate;
 
-    // UPDATED: Notice now reflects the RM20 penalty instead of full forfeiture
-    if (!onTime) {
-        cout << "\nNOTICE: This return is LATE (after " << SHOP_CLOSE_HOUR
-            << ":00 on the rental date, or a different day).\n";
-        cout << "An RM20 late penalty will be deducted from the deposit for every unit.\n\n";
+    bool late = (today > dueRef) || (today == dueRef && currentHour >= SHOP_CLOSE_HOUR);
+    bool onTime = !late;
+
+    if (late) {
+        cout << "\nNotice: this return is LATE (after " << SHOP_CLOSE_HOUR
+            << ":00 on the due date " << dueRef << ", or on a later day).\n";
+        cout << "In line with the rental policy, the deposit is fully forfeited for\n";
+        cout << "every unit on this rental, regardless of its condition.\n\n";
     }
 
+    // which bikes are still out?
     vector<int> pendingIndices;
     for (size_t i = 0; i < rental.units.size(); i++) {
         if (!rental.units[i].isReturned) pendingIndices.push_back((int)i);
     }
 
     if (pendingIndices.empty()) {
-        cout << "\nAll units on this rental have already been returned.\n";
+        cout << "\nEvery unit on this rental has already been returned.\n";
         pauseScreen();
         return;
     }
 
-    cout << "Recording condition for each unit (" << pendingIndices.size()
+    // 3) ask the condition of each bike still out. going back past the
+    //    first one cancels the whole return
+    cout << "Please record the condition of each unit (" << pendingIndices.size()
         << " remaining). Type 'q' at any prompt to go back.\n";
 
     size_t unitPos = 0;
@@ -182,60 +210,52 @@ void processReturn() {
         bool ok = processUnitWizard(unit);
         if (!ok) {
             if (unitPos == 0) {
-                cout << "\nReturn processing cancelled - no changes saved.\n";
+                cout << "\nReturn processing cancelled. No changes were saved.\n";
                 pauseScreen();
                 return;
             }
-            unitPos--;
+            unitPos--;   // step back to the previous bike
             continue;
         }
         unitPos++;
     }
 
-    /* All pending units now have condition/damage recorded - compute
-       refunds and finalise. */
+    // 4) work out each refund and add them up
     int unitsReturnedNow = 0;
-    int unitsLostNow = 0;
     double totalRefund = 0.0;
 
     for (int idx : pendingIndices) {
         RentalUnit& unit = rental.units[idx];
-        double damageCost = 0.0;
 
-        if (unit.condition == "Damaged" || unit.condition == "damaged") {
+        // add up the cost of the damaged parts
+        double damageCost = 0.0;
+        if (unit.condition == "Damaged") {
             if (unit.tyreDamaged)  damageCost += bikeType->tyreCost;
             if (unit.brakeDamaged) damageCost += bikeType->brakeCost;
             if (unit.chainDamaged) damageCost += bikeType->chainCost;
         }
-        else if (unit.condition == "Lost" || unit.condition == "lost") {
-            damageCost = rental.depositPerUnit; // Total loss essentially equals the whole deposit
-        }
-
         unit.damageCost = damageCost;
         unit.returnedOnTime = onTime;
 
-        double refund = 0.0;
-
-        // UPDATED REFUND LOGIC
-        if (unit.condition == "Lost" || unit.condition == "lost") {
-            refund = 0.0;           // Lost bike = 0 refund
-            unitsLostNow++;         // Keep track of lost bikes to exclude from inventory return
+        double refund;
+        if (!onTime) {
+            refund = 0.0;                                   // late -> nothing back
+        }
+        else if (unit.condition == "Damaged") {
+            refund = rental.depositPerUnit - damageCost;    // damaged -> deposit minus repairs
+            if (refund < 0) refund = 0;
         }
         else {
-            double latePenalty = onTime ? 0.0 : 20.0;
-            refund = rental.depositPerUnit - damageCost - latePenalty;
-            if (refund < 0) refund = 0.0; // Prevent negative refund
-            unitsReturnedNow++;     // Bike successfully physically returned
+            refund = rental.depositPerUnit;                 // good + on time -> full deposit
         }
-
         unit.depositRefunded = refund;
         unit.isReturned = true;
 
         totalRefund += refund;
+        unitsReturnedNow++;
     }
 
-    /* Restore returned units to the correct quantity pool
-       (NOTE: unitsLostNow are deliberately NOT added back to inventory) */
+    // 5) put the returned bikes back in the right stock pool
     if (rental.channel == "Booking") {
         bikeType->bookingQuantity += unitsReturnedNow;
     }
@@ -244,7 +264,7 @@ void processReturn() {
     }
     saveBikeTypes(bikeTypes);
 
-    /* Check if the whole rental is now complete */
+    // 6) if every bike is back, close the rental and give points once
     bool allReturned = true;
     for (const auto& u : rental.units) {
         if (!u.isReturned) { allReturned = false; break; }
@@ -254,7 +274,8 @@ void processReturn() {
         rental.returnDate = today;
 
         if (rental.memberId != 0 && !rental.pointsAwarded) {
-            int pts = (int)(rental.quantity * rental.pricePerDay);   // RM1 = 1 point
+            // RM1 of rental price (qty x price/day x days) = 1 point; deposit does not count
+            int pts = (int)(rental.quantity * rental.pricePerDay * rental.rentalDays);
             rental.pointsEarned = pts;
             rental.pointsAwarded = true;
             addPoints(rental.memberId, pts);
@@ -263,17 +284,18 @@ void processReturn() {
 
     saveRentals(rentals);
 
-    //Receipt for this return transaction
+    // 7) print the return receipt
     printLine();
-    cout << "RETURN RECEIPT - Rental " << rental.code << " (" << bikeType->type << ")\n";
+    printCentered("RETURN RECEIPT - " + rental.code + "  (" + bikeType->type + ")");
     printLine();
     cout << fixed << setprecision(2);
-    cout << left << setw(24) << "Renter:" << rental.renterName << "\n";
-    cout << left << setw(24) << "Returned On Time:" << (onTime ? "Yes" : "No (LATE - RM20 Fee)") << "\n";
+    cout << "  " << left << setw(24) << "Renter:" << rental.renterName << "\n";
+    cout << "  " << left << setw(24) << "Due Date:" << dueRef << "\n";
+    cout << "  " << left << setw(24) << "Returned On Time:" << (onTime ? "Yes" : "No (LATE)") << "\n";
     printLine();
     for (const auto& unit : rental.units) {
         if (unit.unitIndex == 0) continue;
-        cout << "Unit #" << unit.unitIndex << " - " << unit.condition;
+        cout << "  Unit #" << unit.unitIndex << " - " << unit.condition;
         if (unit.tyreDamaged || unit.brakeDamaged || unit.chainDamaged) {
             cout << " (";
             if (unit.tyreDamaged) cout << "Tyre ";
@@ -281,72 +303,87 @@ void processReturn() {
             if (unit.chainDamaged) cout << "Chain";
             cout << ")";
         }
-        cout << " -> Refund: RM" << unit.depositRefunded << "\n";
+        cout << "  ->  Refund: RM" << unit.depositRefunded << "\n";
     }
     printLine();
-    cout << left << setw(24) << "Total Deposit Refunded:" << "RM" << totalRefund << "\n";
-    cout << left << setw(24) << "Rental Status:" << rental.status << "\n";
+    cout << "  " << left << setw(24) << "Total Deposit Refunded:" << "RM" << totalRefund << "\n";
+    cout << "  " << left << setw(24) << "Rental Status:" << rental.status << "\n";
     printLine();
     pauseScreen();
 }
 
+/*==================================================================
+  this method looks up one rental by its code and prints the full
+  record: renter, bike, dates, money, status, and each bike's
+  condition / refund
+==================================================================*/
 void viewReceiptMenu() {
     vector<Rental> rentals = loadRentals();
     vector<BikeType> bikeTypes = loadBikeTypes();
+    uiHeader("VIEW RENTAL RECORD / RECEIPT");
+
     string code;
     if (stepString("Enter reservation/reference code (or 'q' to cancel): ", code) == InputResult::BACK) {
-        cout << "Cancelled.\n";
+        cout << "\nOperation cancelled.\n";
         pauseScreen();
         return;
     }
 
     for (const auto& r : rentals) {
         if (r.code == code) {
+            // turn the bike type id into its name
             string bikeTypeName = "Unknown";
             for (const auto& b : bikeTypes) {
                 if (b.id == r.bikeTypeId) { bikeTypeName = b.type; break; }
             }
             printLine();
-            cout << "RENTAL RECORD - " << r.code << "\n";
+            printCentered("RENTAL RECORD - " + r.code);
             printLine();
             cout << fixed << setprecision(2);
-            cout << left << setw(22) << "Renter:" << r.renterName << "\n";
-            cout << left << setw(22) << "Bike Type:" << bikeTypeName << "\n";
-            cout << left << setw(22) << "Quantity:" << r.quantity << "\n";
-            cout << left << setw(22) << "Date:" << r.rentDate << "\n";
-            cout << left << setw(22) << "Total Paid:" << "RM" << r.totalPaid << "\n";
-            cout << left << setw(22) << "Payment Method:" << r.paymentMethod << "\n";
-            cout << left << setw(22) << "Status:" << r.status << "\n";
+            cout << "  " << left << setw(22) << "Renter:" << r.renterName << "\n";
+            cout << "  " << left << setw(22) << "Bike Type:" << bikeTypeName << "\n";
+            cout << "  " << left << setw(22) << "Quantity:" << r.quantity << " unit(s)\n";
+            cout << "  " << left << setw(22) << "Start Date:" << r.rentDate << "\n";
+            cout << "  " << left << setw(22) << "Duration:" << r.rentalDays << " day(s)\n";
+            cout << "  " << left << setw(22) << "Due Date:" << r.dueDate << "\n";
+            cout << "  " << left << setw(22) << "Total Paid:" << "RM" << r.totalPaid << "\n";
+            cout << "  " << left << setw(22) << "Payment Method:" << r.paymentMethod << "\n";
+            cout << "  " << left << setw(22) << "Status:" << r.status << "\n";
+            if (r.status == "Return") {
+                cout << "  " << left << setw(22) << "Return Date:" << r.returnDate << "\n";
+            }
             printLine();
             for (const auto& unit : r.units) {
-                cout << "Unit #" << unit.unitIndex << ": " << unit.condition
-                    << " | Refund: RM" << unit.depositRefunded
-                    << " | Returned: " << (unit.isReturned ? "Yes" : "No") << "\n";
+                cout << "  Unit #" << unit.unitIndex << ": " << unit.condition
+                    << "  | Refund: RM" << unit.depositRefunded
+                    << "  | Returned: " << (unit.isReturned ? "Yes" : "No") << "\n";
             }
             printLine();
             pauseScreen();
             return;
         }
     }
-    cout << "No rental found with this code.\n";
+    cout << "\nNo rental record matches that code.\n";
     pauseScreen();
 }
 
+/*==================================================================
+  this method is the admin "returns & billing" menu. loops until 0
+==================================================================*/
 void memberC_menu() {
     int choice;
     do {
+        uiHeader("RETURN PROCESSING & BILLING  (ADMIN)");
+        printCentered("1. Process Bike Return");
+        printCentered("2. View Rental Record / Receipt");
+        printCentered("0. Back to Main Menu");
         printLine();
-        cout << "RETURN PROCESSING & BILLING (ADMIN)\n";
-        printLine();
-        cout << "1. Process Bike Return\n";
-        cout << "2. View Rental Record / Receipt\n";
-        cout << "0. Back to Main Menu\n";
         choice = getValidatedInt("Enter choice: ", 0, 2);
 
         switch (choice) {
         case 1: processReturn(); break;
         case 2: viewReceiptMenu(); break;
-        case 0: cout << "Returning to main menu...\n"; break;
+        case 0: cout << "\nReturning to the main menu...\n"; break;
         }
     } while (choice != 0);
 }
