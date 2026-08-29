@@ -251,6 +251,7 @@ void printInvoicePreview(const string& renterName, const string& bikeTypeName, i
     double total, bool isWalkIn, double tyreCost, double brakeCost, double chainCost) {
 
     // 1. HEADER
+    cout << "\n\n";
     printLine();
     cout << "                    INVOICE PREVIEW\n";
     printLine();

@@ -291,6 +291,9 @@ int applyLoyaltyDiscount(int memberPoints, int& pointsUsedOut) {
             continue;
         }
 
+        else
+            cout << "Selected discount applied";
+
         pointsUsedOut = reqPoints;
         return discountPercentTable[tierChoice - 1];
     }

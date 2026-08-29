@@ -37,6 +37,7 @@ void showIntro() {
 
 void renterMenu(int memberId, const string& renterName) {
     int choice;
+    system("cls");
     do {
         printLine();
         cout << "RENTER MENU  (" << renterName << ")\n";
@@ -47,9 +48,10 @@ void renterMenu(int memberId, const string& renterName) {
         choice = getValidatedInt("Enter choice: ", 0, 2);
 
         switch (choice) {
-        case 1: bookBike(memberId, renterName); break;
-        case 2: viewRentalHistory(renterName); break;
-        case 0: cout << "Logging out...\n"; break;
+        case 1: system("cls");bookBike(memberId, renterName); break;
+        case 2: system("cls"); viewRentalHistory(renterName); break;
+        case 0: system("cls"); cout << "Logging out...\n"; break;
+
         }
     } while (choice != 0);
 }
@@ -70,13 +72,13 @@ void adminMenu() {
         choice = getValidatedInt("Enter choice: ", 0, 6);
 
         switch (choice) {
-        case 1: memberA_menu(); break;
-        case 2: memberB_menu(); break;
-        case 3: walkInRental(); break;
-        case 4: activateReservation(); break;
-        case 5: memberC_menu(); break;
-        case 6: memberD_menu(); break;
-        case 0: cout << "Logging out...\n"; break;
+        case 1: system("cls"); memberA_menu(); break;
+        case 2: system("cls"); memberB_menu(); break;
+        case 3: system("cls"); walkInRental(); break;
+        case 4: system("cls"); activateReservation(); break;
+        case 5: system("cls"); memberC_menu(); break;
+        case 6: system("cls"); memberD_menu(); break;
+        case 0: system("cls"); cout << "Logged out\n"; break;
         }
     } while (choice != 0);
 }
@@ -85,10 +87,9 @@ int main() {
     srand((unsigned int)time(0));
     ensureDataFilesExist();
 
-    showIntro();
-
     int programChoice;
     do {
+        showIntro();
         printLine();
         cout << "LOGIN\n";
         printLine();
@@ -115,7 +116,7 @@ int main() {
         case 2:
             registerMember();
             break;
-        case 3: {
+        case 3:{
             if (adminLogin()) {
                 adminMenu();
             }
