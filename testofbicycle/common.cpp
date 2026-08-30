@@ -121,7 +121,9 @@ string JsonValue::dump(int indent) const {
 
     switch (type) {
     case JsonType::Null:   return "null";
-    case JsonType::Bool:   return boolVal ? "true" : "false";
+    case JsonType::Bool:
+        if (boolVal) return "true";
+        return "false";
     case JsonType::Number: return numberToJsonString(numVal);
     case JsonType::String: return "\"" + jsonEscapeString(strVal) + "\"";
 
@@ -171,8 +173,16 @@ namespace {
             while (pos < text.size() && isspace((unsigned char)text[pos])) pos++;
         }
 
-        char peek() { return pos < text.size() ? text[pos] : '\0'; }        // look at current char
-        char advance() { return pos < text.size() ? text[pos++] : '\0'; }   // take current char, move on
+        // look at the current character without moving on
+        char peek() {
+            if (pos < text.size()) return text[pos];
+            return '\0';
+        }
+        // take the current character and move to the next one
+        char advance() {
+            if (pos < text.size()) return text[pos++];
+            return '\0';
+        }
 
         // demand a specific char here, or throw
         void expect(char c) {
@@ -644,8 +654,11 @@ string addDaysToDate(const string& dateStr, int days) {
         if (month > 12) { month = 1; year++; }
     }
 
-    string mm = (month < 10 ? "0" : "") + to_string(month);
-    string dd = (day < 10 ? "0" : "") + to_string(day);
+    // pad month and day to 2 digits
+    string mm = to_string(month);
+    if (month < 10) mm = "0" + mm;
+    string dd = to_string(day);
+    if (day < 10) dd = "0" + dd;
     return to_string(year) + "-" + mm + "-" + dd;
 }
 
@@ -733,8 +746,10 @@ static bool tryParseDate(const string& raw, string& normalized, string& errorOut
     }
 
     // pad month/day to 2 digits and hand back "YYYY-MM-DD"
-    string mm = (month < 10 ? "0" : "") + to_string(month);
-    string dd = (day < 10 ? "0" : "") + to_string(day);
+    string mm = to_string(month);
+    if (month < 10) mm = "0" + mm;
+    string dd = to_string(day);
+    if (day < 10) dd = "0" + dd;
     normalized = to_string(year) + "-" + mm + "-" + dd;
     return true;
 }
