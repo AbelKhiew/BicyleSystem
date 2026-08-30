@@ -22,10 +22,11 @@ const string MEMBERS_FILE = "members.json";
 const string BIKETYPES_FILE = "biketypes.json";
 const string RENTALS_FILE = "rentals.json";
 
-const int SHOP_CLOSE_HOUR = 22;   // shop closes 22:00 - used to decide if a return is late
-const int UI_WIDTH = 76;          // width of every centred title / divider line
-const int MIN_RENTAL_DAYS = 1;    // shortest rental allowed
-const int MAX_RENTAL_DAYS = 30;   // longest rental allowed
+const int SHOP_CLOSE_HOUR = 22;      // shop closes 22:00 - used to decide if a return is late
+const double LATE_PENALTY = 20.00;   // RM deducted from each unit's deposit on a late return
+const int UI_WIDTH = 76;             // width of every centred title / divider line
+const int MIN_RENTAL_DAYS = 1;       // shortest rental allowed
+const int MAX_RENTAL_DAYS = 30;      // longest rental allowed
 
 /*==================================================================
   our own tiny JSON value. it can hold null / bool / number /
