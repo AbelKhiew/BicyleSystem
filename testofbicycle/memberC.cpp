@@ -70,7 +70,7 @@ static bool processUnitWizard(RentalUnit& unit) {
 
     int step = 0;
     while (step < 4) {
-        // if it is "Good", skip the tyre/brake/chain questions
+        // Skip damage questions if Good or Lost
         if (step >= 1 && cond != "Damaged" && cond != "damaged") {
             break;
         }
@@ -79,10 +79,12 @@ static bool processUnitWizard(RentalUnit& unit) {
         switch (step) {
         case 0:
             while (true) {
-                res = stepString("  Condition (Good/Damaged): ", cond);
+                res = stepString("  Condition (Good/Damaged/Lost): ", cond);
                 if (res == InputResult::BACK) break;
-                if (cond != "Good" && cond != "good" && cond != "Damaged" && cond != "damaged") {
-                    cout << "  Please enter 'Good' or 'Damaged' (or 'q' to go back).\n";
+                if (cond != "Good" && cond != "good" &&
+                    cond != "Damaged" && cond != "damaged" &&
+                    cond != "Lost" && cond != "lost") {
+                    cout << "  Please enter 'Good', 'Damaged', or 'Lost' (or 'q' to go back).\n";
                     continue;
                 }
                 break;
@@ -102,8 +104,7 @@ static bool processUnitWizard(RentalUnit& unit) {
         }
     }
 
-    // tidy the capitalisation and copy the answers into the unit
-    unit.condition = (cond == "good") ? "Good" : (cond == "damaged") ? "Damaged" : cond;
+    unit.condition = cond;
     unit.tyreDamaged = tyre;
     unit.brakeDamaged = brake;
     unit.chainDamaged = chain;
@@ -111,19 +112,17 @@ static bool processUnitWizard(RentalUnit& unit) {
 }
 
 /*==================================================================
-  this method processes a bike return from start to finish:
-  1. find the rental by code, check it is "Active"
-  2. decide if it is late  (later than the due date, or on the
-     due date after the shop closes)
-  3. ask the condition of every bike not yet back
-  4. work out each refund:
-       late            -> RM0
-       damaged         -> deposit minus the damaged parts' cost
-       good & on time  -> full deposit
-  5. put the bikes back in stock
-  6. if every bike is now back: mark "Return", and give loyalty
-     points once (linked accounts only)
-  7. print the return receipt
+   this method processes a bike return from start to finish:
+   1. find the rental by code, check it is "Active"
+   2. decide if it is late
+   3. ask the condition of every bike not yet back (Good/Damaged/Lost)
+   4. work out each refund:
+        lost            -> RM0
+        late            -> deduct RM20 penalty
+        damaged         -> deduct damaged parts' cost
+   5. put the physically returned bikes back in stock (excludes Lost)
+   6. if every bike is now resolved: mark "Return", give loyalty points
+   7. print the return receipt
 ==================================================================*/
 void processReturn() {
     uiHeader("PROCESS BIKE RETURN");
@@ -181,8 +180,8 @@ void processReturn() {
     if (late) {
         cout << "\nNotice: this return is LATE (after " << SHOP_CLOSE_HOUR
             << ":00 on the due date " << dueRef << ", or on a later day).\n";
-        cout << "In line with the rental policy, the deposit is fully forfeited for\n";
-        cout << "every unit on this rental, regardless of its condition.\n\n";
+        cout << "In line with the rental policy, an RM20.00 late penalty will be\n";
+        cout << "deducted from the deposit for every unit.\n\n";
     }
 
     // which bikes are still out?
@@ -197,8 +196,7 @@ void processReturn() {
         return;
     }
 
-    // 3) ask the condition of each bike still out. going back past the
-    //    first one cancels the whole return
+    // 3) ask the condition of each bike still out.
     cout << "Please record the condition of each unit (" << pendingIndices.size()
         << " remaining). Type 'q' at any prompt to go back.\n";
 
@@ -222,6 +220,7 @@ void processReturn() {
 
     // 4) work out each refund and add them up
     int unitsReturnedNow = 0;
+    int unitsLostNow = 0;
     double totalRefund = 0.0;
 
     for (int idx : pendingIndices) {
@@ -229,33 +228,38 @@ void processReturn() {
 
         // add up the cost of the damaged parts
         double damageCost = 0.0;
-        if (unit.condition == "Damaged") {
+        if (unit.condition == "Damaged" || unit.condition == "damaged") {
             if (unit.tyreDamaged)  damageCost += bikeType->tyreCost;
             if (unit.brakeDamaged) damageCost += bikeType->brakeCost;
             if (unit.chainDamaged) damageCost += bikeType->chainCost;
         }
+        else if (unit.condition == "Lost" || unit.condition == "lost") {
+            damageCost = rental.depositPerUnit; // Total loss
+        }
+
         unit.damageCost = damageCost;
         unit.returnedOnTime = onTime;
 
-        double refund;
-        if (!onTime) {
-            refund = 0.0;                                   // late -> nothing back
-        }
-        else if (unit.condition == "Damaged") {
-            refund = rental.depositPerUnit - damageCost;    // damaged -> deposit minus repairs
-            if (refund < 0) refund = 0;
+        double refund = 0.0;
+
+        if (unit.condition == "Lost" || unit.condition == "lost") {
+            refund = 0.0;           // Lost unit -> RM0 refund
+            unitsLostNow++;         // Keep track to EXCLUDE from inventory replenishment
         }
         else {
-            refund = rental.depositPerUnit;                 // good + on time -> full deposit
+            double lateFee = onTime ? 0.0 : 20.0;
+            refund = rental.depositPerUnit - damageCost - lateFee;
+            if (refund < 0.0) refund = 0.0; // Ensure refund doesn't go negative
+            unitsReturnedNow++;     // Physically returned unit
         }
+
         unit.depositRefunded = refund;
         unit.isReturned = true;
 
         totalRefund += refund;
-        unitsReturnedNow++;
     }
 
-    // 5) put the returned bikes back in the right stock pool
+    // 5) put the returned bikes back in the right stock pool (excludes Lost bikes)
     if (rental.channel == "Booking") {
         bikeType->bookingQuantity += unitsReturnedNow;
     }
@@ -291,7 +295,7 @@ void processReturn() {
     cout << fixed << setprecision(2);
     cout << "  " << left << setw(24) << "Renter:" << rental.renterName << "\n";
     cout << "  " << left << setw(24) << "Due Date:" << dueRef << "\n";
-    cout << "  " << left << setw(24) << "Returned On Time:" << (onTime ? "Yes" : "No (LATE)") << "\n";
+    cout << "  " << left << setw(24) << "Returned On Time:" << (onTime ? "Yes" : "No (LATE - RM20 Fee each unit)") << "\n";
     printLine();
     for (const auto& unit : rental.units) {
         if (unit.unitIndex == 0) continue;

@@ -8,8 +8,8 @@
     "chainCost": 5,
     "deposit": 35,
     "bookingQuantity": 49,
-    "walkinQuantity": 49,
-    "timesRented": 18
+    "walkinQuantity": 50,
+    "timesRented": 24
   },
   {
     "id": 2,

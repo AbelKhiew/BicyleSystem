@@ -341,9 +341,10 @@ static void invoiceMoneyRow(const string& label, double amount, const string& no
 void printInvoicePreview(const string& renterName, const string& bikeTypeName, int quantity,
     int days, double pricePerDay, const string& rentDate, const string& dueDate,
     double subtotalPrice, double depositPerUnit, double depositTotal,
-    int discountPercent, double discountAmount, double total, bool isWalkIn) {
+    int discountPercent, double discountAmount, double total, bool isWalkIn, double tyreCost, double brakeCost, double chainCost) {
 
     // 1. HEADER
+    cout << "\n\n";
     printLine();
     printCentered("RENTAL INVOICE");
     printLine();
@@ -365,12 +366,19 @@ void printInvoicePreview(const string& renterName, const string& bikeTypeName, i
 
     invoiceMoneyRow("Rate per day:", pricePerDay);
     invoiceMoneyRow("Rental Subtotal:", subtotalPrice, rateNote.str());
+
+    invoiceMoneyRow("\nDeposit per unit:", depositPerUnit, "(refundable if returned on time & undamaged)");
+    cout << "  " << left << setw(23) << "- Tyre Coverage:" << "RM " << tyreCost << "\n";
+    cout << "  " << left << setw(23) << "- Brake Coverage:" << "RM " << brakeCost << "\n";
+    cout << "  " << left << setw(23) << "- Chain Coverage:" << "RM " << chainCost << "\n";
+    cout << "  " << left << setw(23) << "- Base Fee:" << "RM 20.00\n";
+    cout << "\n";
+
     if (discountPercent > 0) {
         ostringstream discNote;
         discNote << "(" << discountPercent << "% loyalty discount)";
         invoiceMoneyRow("Discount:", -discountAmount, discNote.str());
     }
-    invoiceMoneyRow("Deposit per unit:", depositPerUnit, "(refundable if returned on time & undamaged)");
     invoiceMoneyRow("Deposit Subtotal:", depositTotal);
     printLine();
     invoiceMoneyRow("TOTAL TO PAY:", total);
@@ -517,7 +525,7 @@ void bookBike(int memberId, const string& renterName) {
 
             printInvoicePreview("", bikeType->type, quantity, days, bikeType->pricePerDay,
                 rentDate, dueDate, subtotalPrice, bikeType->deposit, depositTotal,
-                discountPercent, discountAmount, total, false);
+                discountPercent, discountAmount, total, false,bikeType->tyreCost,bikeType->brakeCost,bikeType->chainCost);
 
             res = stepConfirm("Confirm booking? (y/n): ", confirm);
             break;
@@ -746,9 +754,9 @@ void walkInRental() {
     double discountAmount = subtotalPrice * discountPercent / 100.0;
     double total = (subtotalPrice - discountAmount) + depositTotal;
 
-    printInvoicePreview(renterName, bikeType->type, quantity, days, bikeType->pricePerDay,
+    printInvoicePreview("", bikeType->type, quantity, days, bikeType->pricePerDay,
         rentDate, dueDate, subtotalPrice, bikeType->deposit, depositTotal,
-        discountPercent, discountAmount, total, true);
+        discountPercent, discountAmount, total, false, bikeType->tyreCost, bikeType->brakeCost, bikeType->chainCost);
 
     vector<Rental> rentals = loadRentals();
     string code = generateReservationCode(rentals);

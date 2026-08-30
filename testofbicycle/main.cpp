@@ -53,7 +53,6 @@ void showIntro() {
 ==================================================================*/
 void renterMenu(int memberId, const string& renterName) {
     int choice;
-    system("cls");
     do {
         uiHeader("RENTER MENU  (" + renterName + ")");
         printCentered("1. Book a Bicycle");
@@ -64,9 +63,9 @@ void renterMenu(int memberId, const string& renterName) {
 
         // run the action the renter picked
         switch (choice) {
-        case 1: bookBike(memberId, renterName); break;
-        case 2: viewRentalHistory(renterName); break;
-        case 0: cout << "Logging out...\n"; break;
+        case 1: bookBike(memberId, renterName); break;       // member B
+        case 2: viewRentalHistory(renterName); break;        // member A
+        case 0: cout << "\nLogging out. Returning to the main menu...\n"; break;
         }
     } while (choice != 0);
 }
@@ -90,13 +89,13 @@ void adminMenu() {
         choice = getValidatedInt("Enter choice: ", 0, 6);
 
         switch (choice) {
-        case 1: memberA_menu(); break;
-        case 2: memberB_menu(); break;
-        case 3: walkInRental(); break;
-        case 4: activateReservation(); break;
-        case 5: memberC_menu(); break;
-        case 6: memberD_menu(); break;
-        case 0: cout << "Logging out...\n"; break;
+        case 1: memberA_menu(); break;          // member A - customers
+        case 2: memberB_menu(); break;          // member B - bike inventory
+        case 3: walkInRental(); break;          // member B - walk-in rental
+        case 4: activateReservation(); break;   // member C - activate a booking
+        case 5: memberC_menu(); break;          // member C - returns & billing
+        case 6: memberD_menu(); break;          // member D - reports
+        case 0: cout << "\nLogging out. Returning to the main menu...\n"; break;
         }
     } while (choice != 0);
 }
@@ -113,11 +112,23 @@ int main() {
     seedDefaultMembers();     // add demo renter u1/u1 if there are no members yet
     seedDefaultBikeTypes();   // add 2 starter bikes if the inventory is empty
 
+    showIntro();
+
     int programChoice;
     bool firstLoginScreen = true;   // first pass: don't clear, so the intro stays visible
     do {
-        printLine();
-        cout << "LOGIN\n";
+        if (firstLoginScreen) {
+            printCentered("LOGIN");
+            printLine();
+            firstLoginScreen = false;
+        }
+        else {
+            uiHeader("LOGIN");
+        }
+        printCentered("1. Login as Renter");
+        printCentered("2. Register as New Renter");
+        printCentered("3. Login as Admin");
+        printCentered("0. Exit Program");
         printLine();
         programChoice = getValidatedInt("Enter choice: ", 0, 3);
 
@@ -138,7 +149,7 @@ int main() {
         case 2:                 // new renter sign-up
             registerMember();
             break;
-        case 3: {
+        case 3: {               // admin login
             if (adminLogin()) {
                 adminMenu();
             }
