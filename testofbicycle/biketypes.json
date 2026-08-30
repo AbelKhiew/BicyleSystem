@@ -10,17 +10,5 @@
     "bookingQuantity": 49,
     "walkinQuantity": 49,
     "timesRented": 18
-  },
-  {
-    "id": 2,
-    "type": "456",
-    "pricePerDay": 10,
-    "tyreCost": 150,
-    "brakeCost": 500,
-    "chainCost": 500,
-    "deposit": 1170,
-    "bookingQuantity": 50,
-    "walkinQuantity": 50,
-    "timesRented": 3
   }
 ]
