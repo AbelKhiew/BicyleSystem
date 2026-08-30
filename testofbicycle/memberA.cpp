@@ -303,8 +303,8 @@ void viewRentalHistory(const string& renterName) {
 
     const string indent = " ";
     cout << indent << left << setw(4) << "ID" << setw(26) << "Bike Type" << setw(4)
-        << "Qty" << setw(5) << "Days" << setw(12) << "Date" << setw(8) << "Code"
-        << setw(9) << "Total RM" << "Status" << "\n";
+        << "Qty" << setw(5) << "Days" << setw(11) << "Date" << setw(8) << "Code"
+        << setw(10) << "Total(RM)" << "Status" << "\n";
     cout << indent << string(74, '-') << "\n";
 
     for (const auto& r : mine) {
@@ -317,8 +317,8 @@ void viewRentalHistory(const string& renterName) {
         total << fixed << setprecision(2) << r.totalPaid;
 
         cout << indent << left << setw(4) << r.rentalId << setw(26) << fitStr(bikeTypeName, 26)
-            << setw(4) << r.quantity << setw(5) << r.rentalDays << setw(12) << r.rentDate
-            << setw(8) << r.code << setw(9) << total.str() << r.status << "\n";
+            << setw(4) << r.quantity << setw(5) << r.rentalDays << setw(11) << r.rentDate
+            << setw(8) << r.code << setw(10) << total.str() << r.status << "\n";
     }
     cout << indent << string(74, '-') << "\n";
     pauseScreen();
