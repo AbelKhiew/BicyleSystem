@@ -290,28 +290,44 @@ void damageCostReport() {
 }
 
 /*==================================================================
-  this method counts bikes that came back late and adds up the
-  deposits that were forfeited because of it
+  this method reports money the shop kept from returns that went
+  wrong:
+  - a late unit  -> the shop keeps an RM20 penalty from its deposit
+  - a lost unit  -> the shop keeps the whole deposit
+  it counts each kind and shows the total retained
 ==================================================================*/
 void lateReturnReport() {
     vector<Rental> rentals = loadRentals();
 
     int lateUnitCount = 0;
-    double forfeitedTotal = 0;
+    int lostUnitCount = 0;
+    double latePenaltyTotal = 0.0;
+    double lostForfeitTotal = 0.0;
 
     for (const auto& r : rentals) {
         for (const auto& u : r.units) {
-            if (u.isReturned && !u.returnedOnTime) {
+            if (!u.isReturned) continue;
+
+            if (u.condition == "Lost") {
+                lostUnitCount++;
+                lostForfeitTotal += r.depositPerUnit;      // whole deposit forfeited
+            }
+            else if (!u.returnedOnTime) {
                 lateUnitCount++;
-                forfeitedTotal += r.depositPerUnit;
+                latePenaltyTotal += LATE_PENALTY;          // RM20 penalty per late unit
             }
         }
     }
 
-    uiHeader("LATE RETURN REPORT");
-    cout << "  Late Units Returned      : " << lateUnitCount << "\n";
+    uiHeader("LATE RETURN & LOSS REPORT");
     cout << fixed << setprecision(2);
-    cout << "  Total Deposits Forfeited : RM" << forfeitedTotal << "\n";
+    cout << "  Late units (RM" << LATE_PENALTY << " penalty each)  : " << lateUnitCount
+        << "   ->  RM" << latePenaltyTotal << "\n";
+    cout << "  Lost units (full deposit forfeited) : " << lostUnitCount
+        << "   ->  RM" << lostForfeitTotal << "\n";
+    printLine();
+    cout << "  Total retained by the shop          : RM"
+        << (latePenaltyTotal + lostForfeitTotal) << "\n";
     printLine();
     pauseScreen();
 }
@@ -333,7 +349,9 @@ void topRentersReport() {
         return;
     }
 
-    int topN = (int)summaries.size() < 3 ? (int)summaries.size() : 3;
+    // show at most 3 renters (fewer if there aren't 3)
+    int topN = 3;
+    if ((int)summaries.size() < 3) topN = (int)summaries.size();
     vector<bool> used(summaries.size(), false);   // which rows we have already printed
 
     for (int rank = 1; rank <= topN; rank++) {
@@ -392,7 +410,8 @@ void overdueList() {
         for (const auto& b : bikeTypes) {
             if (b.id == r.bikeTypeId) { bikeTypeName = b.type; break; }
         }
-        string dueRef = r.dueDate.empty() ? r.rentDate : r.dueDate;
+        string dueRef = r.dueDate;
+        if (dueRef.empty()) dueRef = r.rentDate;
 
         // an Active rental past its due date is shown as OVERDUE
         string displayStatus = r.status;
@@ -417,7 +436,7 @@ void memberD_menu() {
         printCentered("2. Monthly Revenue Breakdown (by Payment Method)");
         printCentered("3. Most Rented Bike Type");
         printCentered("4. Damage Cost Report");
-        printCentered("5. Late Return Report");
+        printCentered("5. Late Return & Loss Report");
         printCentered("6. Top Renters Report");
         printCentered("7. Active / Pending / Overdue Rentals List");
         printCentered("0. Back to Main Menu");
