@@ -354,7 +354,12 @@ void printInvoicePreview(const string& renterName, const string& bikeTypeName, i
     }
     cout << "  " << left << setw(22) << "Bike Type:" << bikeTypeName << "\n";
     cout << "  " << left << setw(22) << "Quantity:" << quantity << " unit(s)\n";
-    cout << "  " << left << setw(22) << "Rental Start Date:" << rentDate << (isWalkIn ? " (today)\n" : "\n");
+
+    // walk-in rentals always start today, so mark the date "(today)"
+    cout << "  " << left << setw(22) << "Rental Start Date:" << rentDate;
+    if (isWalkIn) cout << " (today)";
+    cout << "\n";
+
     cout << "  " << left << setw(22) << "Rental Duration:" << days << " day(s)\n";
     cout << "  " << left << setw(22) << "Return By (Due Date):" << dueDate << "\n";
     printLine();
@@ -428,7 +433,8 @@ bool collectPaymentAndReceipt(const string& renterName, const string& bikeTypeNa
         int choice;
         cout << "\nSelect Payment Method:\n  1. QR Pay\n  2. Bank Transfer\n";
         if (stepInt("Enter choice (or 'q' to cancel): ", 1, 2, choice) == InputResult::BACK) return false;
-        paymentMethod = (choice == 1) ? "QR Pay" : "Bank Transfer";
+        if (choice == 1) paymentMethod = "QR Pay";
+        else             paymentMethod = "Bank Transfer";
     }
 
     paymentMethodOut = paymentMethod;
@@ -470,7 +476,8 @@ void bookBike(int memberId, const string& renterName) {
     // how many points this renter has (for the discount step)
     vector<Member> members = loadMembers();
     Member* member = searchMemberById(members, memberId);
-    int memberPoints = (member != nullptr) ? member->points : 0;
+    int memberPoints = 0;
+    if (member != nullptr) memberPoints = member->points;
 
     int typeId = 0, quantity = 0, days = 1;
     string rentDate, dueDate;
@@ -525,7 +532,7 @@ void bookBike(int memberId, const string& renterName) {
 
             printInvoicePreview("", bikeType->type, quantity, days, bikeType->pricePerDay,
                 rentDate, dueDate, subtotalPrice, bikeType->deposit, depositTotal,
-                discountPercent, discountAmount, total, false,bikeType->tyreCost,bikeType->brakeCost,bikeType->chainCost);
+                discountPercent, discountAmount, total, false, bikeType->tyreCost, bikeType->brakeCost, bikeType->chainCost);
 
             res = stepConfirm("Confirm booking? (y/n): ", confirm);
             break;
@@ -699,7 +706,8 @@ void walkInRental() {
 
     // the discount step (3) only exists when an account is linked
     int step = 0;
-    int totalSteps = (linkedMemberId != 0) ? 4 : 3;
+    int totalSteps = 3;
+    if (linkedMemberId != 0) totalSteps = 4;
     while (step < totalSteps) {
         InputResult res = InputResult::OK;
         switch (step) {
