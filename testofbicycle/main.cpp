@@ -1,11 +1,12 @@
-/* ============================================================
-   BICYCLE RENTAL MANAGEMENT SYSTEM
+/*==================================================================
+  main.cpp  -  program start point + main menu / navigation
 
-   - Introduction screen
-   - Login: Renter (name + password) / Admin (hardcoded id=a, pass=a)
-   - Main menu navigation branching to each member's module
-   - Program termination message
-   ============================================================ */
+  what this file does:
+  - shows the welcome screen
+  - handles login: renter, new renter sign-up, or admin
+  - shows the correct menu and calls into each member's module
+  - shows the goodbye message when the user exits
+==================================================================*/
 #include "common.h"
 #include "memberA.h"
 #include "memberB.h"
@@ -16,91 +17,112 @@
 #include <ctime>
 using namespace std;
 
-// Hardcoded admin
+// the one fixed admin account (for the demo). renters live in members.json
+const string ADMIN_ID = "a1";
+const string ADMIN_PASSWORD = "a1";
+
+/*==================================================================
+  this method asks for the admin id + password and returns true
+  only if both match the fixed values above
+==================================================================*/
 bool adminLogin() {
     string id, password;
-    cout << "Admin ID: ";
+    cout << "Administrator ID: ";
     getline(cin, id);
-    cout << "Admin Password: ";
+    cout << "Administrator Password: ";
     getline(cin, password);
-    return (id == "a" && password == "a");
+    return (id == ADMIN_ID && password == ADMIN_PASSWORD);
 }
 
+/*==================================================================
+  this method prints the welcome banner, shown once at start-up
+==================================================================*/
 void showIntro() {
+    clearScreen();
     printLine();
-    cout << "     WELCOME TO THE BICYCLE RENTAL MANAGEMENT SYSTEM\n";
+    printCentered("WELCOME TO THE BICYCLE RENTAL MANAGEMENT SYSTEM");
     printLine();
-    cout << "Rent a bike, manage bookings, and track your rides with ease.\n";
+    printCentered("An integrated platform for bicycle rentals, bookings,");
+    printCentered("returns, billing and management reporting.");
     printLine();
 }
 
-
+/*==================================================================
+  this method is the renter's menu. it keeps looping until the
+  renter picks 0 (logout)
+==================================================================*/
 void renterMenu(int memberId, const string& renterName) {
     int choice;
     system("cls");
     do {
+        uiHeader("RENTER MENU  (" + renterName + ")");
+        printCentered("1. Book a Bicycle");
+        printCentered("2. View My Rental History");
+        printCentered("0. Logout");
         printLine();
-        cout << "RENTER MENU  (" << renterName << ")\n";
-        printLine();
-        cout << "1. Book a Bicycle\n";
-        cout << "2. View My Rental History\n";
-        cout << "0. Logout\n";
         choice = getValidatedInt("Enter choice: ", 0, 2);
 
+        // run the action the renter picked
         switch (choice) {
-        case 1: system("cls");bookBike(memberId, renterName); break;
-        case 2: system("cls"); viewRentalHistory(renterName); break;
-        case 0: system("cls"); cout << "Logging out...\n"; break;
-
+        case 1: bookBike(memberId, renterName); break;
+        case 2: viewRentalHistory(renterName); break;
+        case 0: cout << "Logging out...\n"; break;
         }
     } while (choice != 0);
 }
 
+/*==================================================================
+  this method is the admin's menu. each option jumps into one
+  member's module (A / B / C / D). it loops until 0 (logout)
+==================================================================*/
 void adminMenu() {
     int choice;
     do {
+        uiHeader("ADMIN MENU");
+        printCentered("1. Customer / Member Management");
+        printCentered("2. Bicycle Inventory Management");
+        printCentered("3. Walk-in Rental");
+        printCentered("4. Activate Reservation");
+        printCentered("5. Return Processing & Billing");
+        printCentered("6. Reporting & Statistics");
+        printCentered("0. Logout");
         printLine();
-        cout << "ADMIN MENU\n";
-        printLine();
-        cout << "1. Customer / Member Management\n";
-        cout << "2. Bicycle Inventory Management\n";
-        cout << "3. Walk-in Rental\n";
-        cout << "4. Activate Reservation\n";
-        cout << "5. Return Processing & Billing\n";
-        cout << "6. Reporting & Statistics\n";
-        cout << "0. Logout\n";
         choice = getValidatedInt("Enter choice: ", 0, 6);
 
         switch (choice) {
-        case 1: system("cls"); memberA_menu(); break;
-        case 2: system("cls"); memberB_menu(); break;
-        case 3: system("cls"); walkInRental(); break;
-        case 4: system("cls"); activateReservation(); break;
-        case 5: system("cls"); memberC_menu(); break;
-        case 6: system("cls"); memberD_menu(); break;
-        case 0: system("cls"); cout << "Logged out\n"; break;
+        case 1: memberA_menu(); break;
+        case 2: memberB_menu(); break;
+        case 3: walkInRental(); break;
+        case 4: activateReservation(); break;
+        case 5: memberC_menu(); break;
+        case 6: memberD_menu(); break;
+        case 0: cout << "Logging out...\n"; break;
         }
     } while (choice != 0);
 }
 
+/*==================================================================
+  this method is where the program starts. it sets up the data
+  files, shows the intro, then loops the login menu until the
+  user picks 0 (exit)
+==================================================================*/
 int main() {
-    srand((unsigned int)time(0));
-    ensureDataFilesExist();
+    srand((unsigned int)time(0));   // seed random numbers (used to make reservation codes)
+
+    ensureDataFilesExist();   // create members / biketypes / rentals .json if missing
+    seedDefaultMembers();     // add demo renter u1/u1 if there are no members yet
+    seedDefaultBikeTypes();   // add 2 starter bikes if the inventory is empty
 
     int programChoice;
+    bool firstLoginScreen = true;   // first pass: don't clear, so the intro stays visible
     do {
-        showIntro();
         printLine();
         cout << "LOGIN\n";
         printLine();
-        cout << "1. Login as Renter\n";
-        cout << "2. Register as New Renter\n";
-        cout << "3. Login as Admin\n";
-        cout << "0. Exit Program\n";
         programChoice = getValidatedInt("Enter choice: ", 0, 3);
 
         switch (programChoice) {
-        case 1: {
+        case 1: {   // renter login - check name + password against members.json
             string name = getValidatedString("Username: ");
             string password = getValidatedString("Password: ");
             int memberId;
@@ -108,32 +130,34 @@ int main() {
                 renterMenu(memberId, name);
             }
             else {
-                cout << "Invalid username or password.\n";
+                cout << "\nLogin failed: the username or password is incorrect.\n";
                 pauseScreen();
             }
             break;
         }
-        case 2:
+        case 2:                 // new renter sign-up
             registerMember();
             break;
-        case 3:{
+        case 3: {
             if (adminLogin()) {
                 adminMenu();
             }
             else {
-                cout << "Invalid admin credentials.\n";
+                cout << "\nLogin failed: the administrator credentials are incorrect.\n";
                 pauseScreen();
             }
             break;
         }
         case 0:
-            break;
+            break;              // leave the loop and end the program
         }
     } while (programChoice != 0);
 
+    // goodbye screen
+    clearScreen();
     printLine();
-    cout << "   Thank you for using the Bicycle Rental Management System.\n";
-    cout << "                         Goodbye(^w^).\n";
+    printCentered("Thank you for using the Bicycle Rental Management System.");
+    printCentered("The program has ended. Have a pleasant day.");
     printLine();
 
     return 0;
