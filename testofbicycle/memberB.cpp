@@ -372,11 +372,14 @@ void printInvoicePreview(const string& renterName, const string& bikeTypeName, i
     invoiceMoneyRow("Rate per day:", pricePerDay);
     invoiceMoneyRow("Rental Subtotal:", subtotalPrice, rateNote.str());
 
-    invoiceMoneyRow("\nDeposit per unit:", depositPerUnit, "(refundable if returned on time & undamaged)");
-    cout << "  " << left << setw(23) << "- Tyre Coverage:" << "RM " << tyreCost << "\n";
-    cout << "  " << left << setw(23) << "- Brake Coverage:" << "RM " << brakeCost << "\n";
-    cout << "  " << left << setw(23) << "- Chain Coverage:" << "RM " << chainCost << "\n";
-    cout << "  " << left << setw(23) << "- Base Fee:" << "RM 20.00\n";
+    // deposit block - the sub-rows use the same money helper so every RM lines up
+    double baseFee = depositPerUnit - tyreCost - brakeCost - chainCost;
+    cout << "\n";
+    invoiceMoneyRow("Deposit per unit:", depositPerUnit, "(refundable if returned on time & undamaged)");
+    invoiceMoneyRow("  - Tyre coverage:", tyreCost);
+    invoiceMoneyRow("  - Brake coverage:", brakeCost);
+    invoiceMoneyRow("  - Chain coverage:", chainCost);
+    invoiceMoneyRow("  - Base fee:", baseFee);
     cout << "\n";
 
     if (discountPercent > 0) {
